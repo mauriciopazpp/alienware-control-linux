@@ -335,7 +335,7 @@ Also say which lights changed and which zone lit what. Zone numbers and key IDs 
 alienware_control/   the app (Python, GTK 4 + libadwaita)
 helpers/             the two root helpers for BIOS settings
 data/                icon, menu entry, polkit policy, udev rules
-installer/           graphical installer, install/uninstall scripts, .deb builder
+installer/           graphical installer, install/uninstall scripts, .deb builder, release script
 screenshots/         images used in this README
 ```
 
