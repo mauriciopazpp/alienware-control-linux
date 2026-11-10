@@ -1,0 +1,3 @@
+# Alienware Control (optional): let the NVIDIA GPU's HDMI audio function runtime-suspend.
+# If it stays "on", the whole dGPU never sleeps, wasting ~10-15 W and running the GPU fan.
+ACTION=="add|bind", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x040300", TEST=="power/control", ATTR{power/control}="auto"

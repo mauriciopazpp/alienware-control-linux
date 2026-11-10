@@ -1,0 +1,30 @@
+#!/usr/bin/python3 -I
+# Alienware Control: read the supported BIOS settings (read-only).
+# Runs as root through pkexec without a password (see the polkit policy). Takes no arguments.
+import json
+import os
+
+BASE = "/sys/class/firmware-attributes/dell-wmi-sysman/attributes"
+ATTRS = ("AWThermalManagement", "PrimaryBattChargeCfg", "TurboMode",
+         "CustomChargeStart", "CustomChargeStop")
+
+
+def read(path):
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+out = {}
+for name in ATTRS:
+    d = os.path.join(BASE, name)
+    out[name] = {
+        "value": read(os.path.join(d, "current_value")),
+        "possible": [v for v in (read(os.path.join(d, "possible_values")) or "").split(";") if v],
+        "min": read(os.path.join(d, "min_value")),
+        "max": read(os.path.join(d, "max_value")),
+    }
+out["pending_reboot"] = read(os.path.join(BASE, "pending_reboot")) == "1"
+print(json.dumps(out))

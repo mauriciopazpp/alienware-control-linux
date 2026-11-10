@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Uninstall Alienware Control
+Name[pt_BR]=Desinstalar o Alienware Control
+Comment=Remove Alienware Control from this computer
+Comment[pt_BR]=Remover o Alienware Control deste computador
+Icon=edit-delete
+Exec=sh -c "exec /usr/bin/python3 \"\\$(dirname \"\\$1\")/installer/installer.py\" --uninstall" sh %k
+Terminal=false

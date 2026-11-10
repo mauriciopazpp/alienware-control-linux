@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Install Alienware Control
+Name[pt_BR]=Instalar o Alienware Control
+Comment=Install, update or uninstall Alienware Control
+Comment[pt_BR]=Instalar, atualizar ou desinstalar o Alienware Control
+Icon=system-software-install
+Exec=sh -c "exec /usr/bin/python3 \"\\$(dirname \"\\$1\")/installer/installer.py\"" sh %k
+Terminal=false
