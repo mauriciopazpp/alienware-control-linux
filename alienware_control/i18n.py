@@ -81,6 +81,8 @@ PT = {
         "e troca de cor em degraus.",
     "Blink": "Piscar",
     "Stars (typing)": "Estrelas (ao digitar)",
+    "Ripple (typing)": "Gota (ao digitar)",
+    "Colour stripes": "Faixas coloridas",
     "Traffic light": "Semáforo",
     "Effect": "Efeito",
     "hover to preview": "passe o mouse para ver",

@@ -106,6 +106,8 @@
 - Four lights: the keyboard, the power button, the lid logo and the **rear light strip**. Click one on the drawing to edit it.
 - Colour wheel, brightness, hex and RGB readout, quick colours.
 - **Effect gallery** with live previews for every light. Keyboard: static, breathing, wave, pulse, colour mix, night rider. Power button, logo and rear strip: breathing, pulse, colour shift, spectrum, fire, aurora, ocean, sunset. The rear strip has two halves, so it also gets two-halves, swap, tide, rainbow wave and police.
+- **Ripple (typing):** a ring of light spreads from every key you press, like a drop in water. The keyboard has no such effect built in, so a small helper draws it key by key: it sleeps until you type, and measured about 1% of one CPU core while typing and 11 MB of RAM. It reads key presses from the keyboard's lighting device only to place the ripple; nothing is stored or sent.
+- More keyboard looks found by testing: rainbow wave, spectrum, stars (reacts to typing) and static colour stripes.
 - **Scenes:** one click sets all four lights (Neon, Ember, Aurora, Rainbow, Ocean, Focus, Lights off).
 - Speed (slow, normal, fast) and a second colour where the effect uses one.
 - Effects run on the controllers themselves, so they keep going with the app closed and use no CPU.

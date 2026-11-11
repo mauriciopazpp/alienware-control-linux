@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import awelc  # noqa: E402
 import awkbd  # noqa: E402
 import fx  # noqa: E402
+import keymap  # noqa: E402
 
 CONFIG_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "alienware-control")
 CONFIG = os.path.join(CONFIG_DIR, "lights.json")
@@ -98,7 +99,13 @@ def apply_keyboard(state):
         rgb = tuple(state["color"])
         effect = HW_EFFECTS.get(state.get("effect"))
         tempo = awkbd.SPEED_TEMPOS.get(state.get("speed"), 0x07)
-        if state.get("effect") == "kb_rainbow":  # wave + two-colour flag = rainbow wave
+        if state.get("effect") in ("ripple", "stripes"):  # per-key looks
+            kbd.set_effect(awkbd.EFFECT_EXIT, 0xFE, (0, 0, 0))
+            if state["effect"] == "ripple":  # resting colour; ripple.py draws the rings
+                kbd.set_colors([(k, tuple(state["color2"])) for k in KEYBOARD_KEYS])
+            else:
+                kbd.set_colors([(k, keymap.stripe_color(k)) for k in KEYBOARD_KEYS])
+        elif state.get("effect") == "kb_rainbow":  # wave + two-colour flag = rainbow wave
             kbd.set_effect(awkbd.EFFECT_WAVE, tempo, rgb, tuple(state["color2"]), colors=2)
         elif state.get("effect") == "kb_spectrum":
             kbd.set_effect(awkbd.EFFECT_SPECTRUM, tempo, rgb)
@@ -111,6 +118,16 @@ def apply_keyboard(state):
         else:
             kbd.set_effect(awkbd.EFFECT_EXIT, 0xFE, (0, 0, 0))
             kbd.set_colors([(k, rgb) for k in KEYBOARD_KEYS])
+
+
+def start_ripple(cfg):
+    """Start the ripple helper when the keyboard effect needs it (it exits by itself otherwise)."""
+    if cfg["keyboard"]["effect"] != "ripple":
+        return
+    import subprocess
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ripple.py")
+    subprocess.Popen([sys.executable, script, "run"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
 
 
 def elc_groups(cfg):
@@ -141,6 +158,7 @@ def apply(cfg, parts=("keyboard", "elc")):
     if "keyboard" in parts:
         try:
             apply_keyboard(cfg["keyboard"])
+            start_ripple(cfg)
         except (OSError, awkbd.KbdError) as e:
             errors.append(f"keyboard: {e}")
     if "elc" in parts:

@@ -88,6 +88,7 @@ class Keyboard:
             self.fd = os.open(self.path, os.O_RDWR)
         except PermissionError:
             raise KbdError(f"no permission on {self.path}: run the installer") from None
+        self.pause = 0.02  # delay after each report; bursts can hang the controller
 
     def close(self):
         os.close(self.fd)
@@ -100,7 +101,7 @@ class Keyboard:
 
     def _write(self, buf):
         fcntl.ioctl(self.fd, HIDIOCSFEATURE, bytes(buf))
-        time.sleep(0.02)
+        time.sleep(self.pause)
 
     def _send(self, command, extra=b"", offset=None):
         if tuple(command) not in ALLOWED:
@@ -132,6 +133,19 @@ class Keyboard:
         if any(not 0 <= key < 254 for key, _ in items):
             raise KbdError("key id out of range")
         self.reset()
+        for i in range(0, len(items), 15):
+            block = bytearray()
+            for key, (r, g, b) in items[i:i + 15]:
+                block += bytes((key + 1, r, g, b))
+            self._send(CMD_COLOR, block, offset=4)
+        self._send(CMD_LOOP)
+        self._send(CMD_UPDATE)
+
+    def update_colors(self, items):
+        """Repaint only some keys, without the reset `set_colors` does (keyboard must be in
+        per-key mode). Used for animations drawn by software."""
+        if any(not 0 <= key < 254 for key, _ in items):
+            raise KbdError("key id out of range")
         for i in range(0, len(items), 15):
             block = bytearray()
             for key, (r, g, b) in items[i:i + 15]:

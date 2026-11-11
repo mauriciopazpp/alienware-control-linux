@@ -30,6 +30,7 @@ PALETTES = {
 # so its effects are built from colour steps ("holds") instead.
 STEPPED_ZONES = ("power",)
 POLICE = ((255, 0, 0), (0, 40, 255))
+STRIPES = [(255, 0, 0), (0, 255, 0), (0, 60, 255), (255, 200, 0), (255, 0, 200), (0, 255, 255)]
 
 # key, label, zones it applies to, number of user colours (0, 1 or 2), has speed
 Effect = namedtuple("Effect", "key label zones colors speed")
@@ -46,6 +47,8 @@ CATALOG = [
     Effect("kb_rainbow", "Rainbow wave", ("keyboard",), 0, True),
     Effect("kb_spectrum", "Spectrum", ("keyboard",), 0, True),
     Effect("stars", "Stars (typing)", ("keyboard",), 1, False),
+    Effect("ripple", "Ripple (typing)", ("keyboard",), 2, False),
+    Effect("stripes", "Colour stripes", ("keyboard",), 0, False),
     Effect("duo", "Colour shift", ELC, 2, True),
     Effect("signal", "Traffic light", ("power",), 0, True),
     Effect("spectrum", "Spectrum", FADING, 0, True),
@@ -144,6 +147,12 @@ def sample(zone, key, c1, c2, seconds, speed="normal", u=0.5):
         if key == "kb_spectrum":
             pal = PALETTES["spectrum"]
             return _palette(pal, t * 0.8 + int(u * 12) * 1.7)
+        if key == "ripple":  # colour 1 = the ring, colour 2 = the resting keys
+            age = (t * 1.4) % 1.6
+            ring = max(0.0, 1.0 - abs(abs(u - 0.5) - age * 0.5) / 0.09) if age < 1.1 else 0.0
+            return _mix(c2, c1, ring * (1 - age / 1.1) ** 0.6 if age < 1.1 else 0.0)
+        if key == "stripes":
+            return STRIPES[int(u * 12) % len(STRIPES)]
         if key == "stars":  # a few keys twinkle, as if someone were typing
             cell = int(u * 12)
             beat = int(t * 3)
