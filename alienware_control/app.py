@@ -76,15 +76,15 @@ PRESETS = [
 CYAN, VIOLET, WHITE = (62, 232, 255), (138, 92, 255), (200, 225, 255)
 # name, {light: (effect, colour, colour 2)}, brightness
 SCENES = [
-    ("Neon", {"keyboard": ("wave", CYAN, VIOLET), "power": ("breathing", CYAN, VIOLET),
+    ("Neon", {"keyboard": ("wave", CYAN, VIOLET), "power": ("static", (0, 255, 0), (255, 170, 0)),
               "logo": ("duo", CYAN, VIOLET), "rear": ("swap", CYAN, VIOLET)}, 100),
     ("Ember", {"keyboard": ("breathing", (255, 90, 0), (255, 0, 0)), "power": ("static", (255, 40, 0), (255, 0, 0)),
                "logo": ("fire", (255, 90, 0), (255, 0, 0)), "rear": ("fire", (255, 90, 0), (255, 0, 0))}, 100),
-    ("Aurora", {"keyboard": ("mix", (0, 255, 140), (130, 80, 255)), "power": ("aurora", (0, 255, 140), (130, 80, 255)),
+    ("Aurora", {"keyboard": ("mix", (0, 255, 140), (130, 80, 255)), "power": ("static", (0, 255, 0), (255, 170, 0)),
                 "logo": ("aurora", (0, 255, 140), (130, 80, 255)), "rear": ("swap", (0, 255, 140), (130, 80, 255))}, 100),
-    ("Rainbow", {"keyboard": ("wave", (255, 60, 200), CYAN), "power": ("spectrum", (255, 60, 200), CYAN),
+    ("Rainbow", {"keyboard": ("wave", (255, 60, 200), CYAN), "power": ("signal", (255, 0, 0), (0, 255, 0)),
                  "logo": ("spectrum", (255, 60, 200), CYAN), "rear": ("rainbow_wave", (255, 60, 200), CYAN)}, 100),
-    ("Ocean", {"keyboard": ("nightrider", (0, 120, 255), CYAN), "power": ("static", (0, 120, 255), CYAN),
+    ("Ocean", {"keyboard": ("nightrider", (0, 120, 255), CYAN), "power": ("static", (0, 255, 0), (255, 170, 0)),
                "logo": ("ocean", (0, 120, 255), CYAN), "rear": ("tide", (0, 160, 255), CYAN)}, 100),
     ("Focus", {z: ("static", WHITE, WHITE) for z in lights.ZONES}, 40),
     ("Lights off", {z: ("static", (60, 60, 60), (60, 60, 60)) for z in lights.ZONES}, 0),
@@ -729,9 +729,15 @@ class Window(Adw.ApplicationWindow):
         self._loading = False
         self.speed_box.set_visible(effect.speed)
         self.slot_seg.set_visible(effect.colors == 2)
-        self.fixed_note.set_visible(effect.colors == 0)
+        if self.zone == "power":
+            self.fixed_note.set_label(_("The power button LED has no blue: it shows red, green and their "
+                                        "mixes (yellow, orange), and changes colour in steps."))
+        else:
+            self.fixed_note.set_label(_("This effect has its own colours. Brightness still applies."))
+        self.fixed_note.set_visible(effect.colors == 0 or self.zone == "power")
         for pv in self.fx_previews:
-            pv.set_colors(state["color"], state["color2"], state["speed"])
+            pv.set_colors(lights.led_color(self.zone, state["color"]),
+                          lights.led_color(self.zone, state["color2"]), state["speed"])
 
     def effect_toggled(self, btn, key):
         if self._loading or not btn.get_active():
@@ -760,6 +766,7 @@ class Window(Adw.ApplicationWindow):
 
     def scene_clicked(self, _btn, zones, brightness):
         for zone, (effect, c1, c2) in zones.items():
+            effect = effect if fx.valid(zone, effect) else "static"
             self.lcfg[zone].update(effect=effect, color=list(c1), color2=list(c2),
                                    brightness=brightness, speed="normal")
         self.select_zone(self.zone, rotate=False)
@@ -780,20 +787,21 @@ class Window(Adw.ApplicationWindow):
 
     def laptop_state(self):
         return {z: {"effect": st["effect"], "speed": st["speed"],
-                    "color": lights.scaled(st["color"], st["brightness"]),
-                    "color2": lights.scaled(st["color2"], st["brightness"])}
+                    "color": lights.led_color(z, lights.scaled(st["color"], st["brightness"])),
+                    "color2": lights.led_color(z, lights.scaled(st["color2"], st["brightness"]))}
                 for z, st in self.lcfg.items()}
 
     def update_color_info(self):
         state = self.lcfg[self.zone]
-        shown = lights.scaled(state[self.slot], state["brightness"])
+        shown = lights.led_color(self.zone, lights.scaled(state[self.slot], state["brightness"]))
         self.big_swatch.set_rgb(shown)
         self.hex_label.set_label("#%02X%02X%02X" % shown)
         self.rgb_label.set_label("R %d  G %d  B %d" % shown)
         b = state["brightness"]
         self.bright_label.set_label(_("off") if b == 0 else f"{b}%")
         for pv in self.fx_previews:
-            pv.set_colors(state["color"], state["color2"], state["speed"])
+            pv.set_colors(lights.led_color(self.zone, state["color"]),
+                          lights.led_color(self.zone, state["color2"]), state["speed"])
         self.laptop.set_state(self.laptop_state())
 
     def wheel_changed(self):

@@ -24,25 +24,32 @@ PALETTES = {
     "aurora": [(0, 255, 140), (0, 200, 255), (130, 80, 255), (0, 255, 200)],
     "ocean": [(0, 60, 255), (0, 200, 255), (0, 255, 190), (0, 120, 255)],
     "sunset": [(255, 60, 120), (255, 120, 0), (150, 60, 255), (255, 0, 80)],
+    "signal": [(255, 0, 0), (255, 170, 0), (0, 255, 0)],
 }
+# The m15 R7 power button LED has no blue channel and cannot fade: morphs flicker,
+# so its effects are built from colour steps ("holds") instead.
+STEPPED_ZONES = ("power",)
 POLICE = ((255, 0, 0), (0, 40, 255))
 
 # key, label, zones it applies to, number of user colours (0, 1 or 2), has speed
 Effect = namedtuple("Effect", "key label zones colors speed")
 ELC = ("power", "logo", "rear")
+FADING = ("logo", "rear")
 CATALOG = [
     Effect("static", "Static", ("keyboard",) + ELC, 1, False),
-    Effect("breathing", "Breathing", ("keyboard",) + ELC, 1, True),
-    Effect("pulse", "Pulse", ("keyboard",) + ELC, 1, True),
+    Effect("breathing", "Breathing", ("keyboard",) + FADING, 1, True),
+    Effect("pulse", "Pulse", ("keyboard",) + FADING, 1, True),
+    Effect("blink", "Blink", ELC, 1, True),
     Effect("wave", "Wave", ("keyboard",), 1, True),
     Effect("mix", "Colour mix", ("keyboard",), 2, True),
     Effect("nightrider", "Night rider", ("keyboard",), 1, True),
     Effect("duo", "Colour shift", ELC, 2, True),
-    Effect("spectrum", "Spectrum", ELC, 0, True),
+    Effect("signal", "Traffic light", ("power",), 0, True),
+    Effect("spectrum", "Spectrum", FADING, 0, True),
     Effect("fire", "Fire", ELC, 0, True),
-    Effect("aurora", "Aurora", ELC, 0, True),
-    Effect("ocean", "Ocean", ELC, 0, True),
-    Effect("sunset", "Sunset", ELC, 0, True),
+    Effect("aurora", "Aurora", FADING, 0, True),
+    Effect("ocean", "Ocean", FADING, 0, True),
+    Effect("sunset", "Sunset", FADING, 0, True),
     # rear strip only: it has two halves that blend in the middle
     Effect("split", "Two halves", ("rear",), 2, False),
     Effect("swap", "Swap", ("rear",), 2, True),
@@ -79,8 +86,15 @@ def _palette(colors, t):
     return _mix(colors[i], colors[(i + 1) % n], t % 1)
 
 
-def _single(key, c1, c2, t):
+def _single(key, c1, c2, t, stepped=False):
     """Colour of one ELC zone at step-time t."""
+    if key == "blink":
+        return c1 if (t % 2) < 1 else BLACK
+    if stepped:
+        if key == "duo":
+            return c1 if (t % 2) < 1 else c2
+        if key in PALETTES:
+            return PALETTES[key][int(t) % len(PALETTES[key])]
     if key == "breathing":
         return _mix(BLACK, c1, _tri(t))
     if key == "pulse":
@@ -127,7 +141,7 @@ def sample(zone, key, c1, c2, seconds, speed="normal", u=0.5):
         blend = min(1.0, max(0.0, (u - 0.36) / 0.28))
         blend = blend * blend * (3 - 2 * blend)
         return _mix(a, b, blend)
-    return _single(key, c1, c2, t)
+    return _single(key, c1, c2, t, stepped=zone in STEPPED_ZONES)
 
 
 # ---------- AW-ELC action lists ----------
@@ -140,8 +154,15 @@ def _hold(colors, d):
     return [(MODE_COLOR, d, HOLD_TEMPO, tuple(c)) for c in colors]
 
 
-def _one(key, c1, c2, speed):
+def _one(key, c1, c2, speed, stepped=False):
     d = SPEEDS.get(speed, SPEEDS["normal"])
+    if key == "blink":
+        return _hold([c1, BLACK], d)
+    if stepped:
+        if key == "duo":
+            return _hold([c1, c2], d)
+        if key in PALETTES:
+            return _hold(PALETTES[key], d)
     if key == "breathing":
         return _morph([c1, BLACK], d)
     if key == "pulse":
@@ -153,7 +174,7 @@ def _one(key, c1, c2, speed):
     return [(MODE_COLOR, 1, 2, tuple(c1))]  # static, as tested
 
 
-def elc_actions(key, c1, c2, speed, halves=1, scale=1.0):
+def elc_actions(key, c1, c2, speed, halves=1, scale=1.0, stepped=False):
     """Action lists for a zone group: one list per half (rear strip) or a single list.
 
     `scale` (0..1) dims fixed palettes the same way brightness dims the user colours.
@@ -177,6 +198,6 @@ def elc_actions(key, c1, c2, speed, halves=1, scale=1.0):
             step = max(250, d // 4)
             a, b = _hold([POLICE[0], BLACK], step), _hold([BLACK, POLICE[1]], step)
         return [dim(a), dim(b)] if fixed else [a, b]
-    one = _one(key, c1, c2, speed)
+    one = _one(key, c1, c2, speed, stepped)
     one = dim(one) if fixed else one
     return [one] * halves

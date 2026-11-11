@@ -264,6 +264,8 @@ The m15 R7 has two separate USB HID lighting controllers, driven through `/dev/h
 
 Zone 4 is the power button's status indicator: setting it makes the button blink, so the app never touches it.
 
+The power button LED on the m15 R7 has **no blue channel** (it shows red, green and their mixes) and cannot fade: morph actions flicker. The app gives it stepped effects instead (blink, colour shift, traffic light, fire) and previews the colour it can really show.
+
 The keyboard sequence was found by testing on the real machine. Set the brightness first, because that command resets the controller. Then leave hardware-effect mode (`80 01 FE`). Then paint the keys (`8C 02 00 [id+1 R G B]…`, `8C 13`, `8B 01 FF`). Painting keys while an effect is active blanks the keyboard.
 
 Effects are one hardware command, `80 <type> <tempo> … <RGB1> <RGB2>`, then `8B 01 FF`:

@@ -82,6 +82,11 @@ def save(cfg):
     os.replace(tmp, CONFIG)
 
 
+def led_color(zone, rgb):
+    """What the LED can actually show: the m15 R7 power button has no blue channel."""
+    return (rgb[0], rgb[1], 0) if zone == "power" else tuple(rgb)
+
+
 def scaled(rgb, brightness):
     k = max(0, min(100, brightness)) / 100
     return tuple(int(round(c * k)) for c in rgb)
@@ -107,9 +112,10 @@ def elc_groups(cfg):
     groups = []
     for name, zones in ELC_ZONES.items():
         st = cfg[name]
-        lists = fx.elc_actions(st["effect"], scaled(st["color"], st["brightness"]),
-                               scaled(st["color2"], st["brightness"]), st["speed"],
-                               halves=len(zones), scale=st["brightness"] / 100)
+        lists = fx.elc_actions(st["effect"], led_color(name, scaled(st["color"], st["brightness"])),
+                               led_color(name, scaled(st["color2"], st["brightness"])), st["speed"],
+                               halves=len(zones), scale=st["brightness"] / 100,
+                               stepped=name in fx.STEPPED_ZONES)
         if len(zones) > 1 and lists[0] == lists[1]:
             groups.append((zones, lists[0]))
         else:

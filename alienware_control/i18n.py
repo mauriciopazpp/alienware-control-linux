@@ -75,6 +75,12 @@ PT = {
     "Colour 2": "Cor 2",
     "This effect has its own colours. Brightness still applies.":
         "Este efeito tem cores próprias. O brilho continua valendo.",
+    "The power button LED has no blue: it shows red, green and their mixes (yellow, orange), and changes "
+    "colour in steps.":
+        "O LED do botão de ligar não tem azul: ele mostra vermelho, verde e as misturas (amarelo, laranja), "
+        "e troca de cor em degraus.",
+    "Blink": "Piscar",
+    "Traffic light": "Semáforo",
     "Effect": "Efeito",
     "hover to preview": "passe o mouse para ver",
     "Speed": "Velocidade",
