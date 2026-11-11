@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Lighting for the Alienware m15 R7: keyboard (Darfon), lid logo and power button (AW-ELC).
+"""Lighting for the Alienware m15 R7: keyboard (Darfon); lid logo, power button and rear light (AW-ELC).
 
 Map confirmed on hardware:
   keyboard      -> Darfon 0d62:dabc, keys 0..159
+  rear light    -> AW-ELC 187c:0550, zones 0 and 1 (two halves that blend in the middle)
   power button  -> AW-ELC 187c:0550, zone 2
   lid logo      -> AW-ELC 187c:0550, zone 3
+  zone 4 is the power button's status indicator (it starts blinking): never touched
 
 Usage:  lights.py apply   (re-applies the saved colours; run at login)
 """
@@ -22,8 +24,8 @@ CONFIG_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("
 CONFIG = os.path.join(CONFIG_DIR, "lights.json")
 LEGACY_CONFIG = os.path.join(CONFIG_DIR, "luzes.json")
 KEYBOARD_KEYS = range(160)
-ELC_ZONES = {"power": 2, "logo": 3}
-ZONES = ("keyboard", "power", "logo")
+ELC_ZONES = {"power": (2,), "logo": (3,), "rear": (0, 1)}
+ZONES = ("keyboard", "power", "logo", "rear")
 EFFECTS = ("static", "breathing", "wave", "pulse", "mix", "nightrider")
 HW_EFFECTS = {"breathing": awkbd.EFFECT_BREATHING, "wave": awkbd.EFFECT_WAVE, "pulse": awkbd.EFFECT_PULSE,
               "mix": awkbd.EFFECT_MIX_PULSE, "nightrider": awkbd.EFFECT_NIGHT_RIDER}
@@ -33,6 +35,7 @@ DEFAULTS = {
     "keyboard": {"color": [0, 160, 255], "color2": [138, 60, 255], "brightness": 100, "effect": "static"},
     "power": {"color": [0, 160, 255], "brightness": 100},
     "logo": {"color": [0, 160, 255], "brightness": 100},
+    "rear": {"color": [0, 160, 255], "brightness": 100},
 }
 
 
@@ -102,10 +105,11 @@ def apply_keyboard(state):
 
 
 def apply_elc(cfg):
-    items = [(zone, scaled(cfg[name]["color"], cfg[name]["brightness"])) for name, zone in ELC_ZONES.items()]
+    items = [(zone, scaled(cfg[name]["color"], cfg[name]["brightness"]))
+             for name, zones in ELC_ZONES.items() for zone in zones]
     with awelc.Elc() as elc:
         elc.set_zone_colors(items)
-        elc.set_brightness(100, list(ELC_ZONES.values()))
+        elc.set_brightness(100, [z for zones in ELC_ZONES.values() for z in zones])
 
 
 def apply(cfg, parts=("keyboard", "elc")):
@@ -120,7 +124,7 @@ def apply(cfg, parts=("keyboard", "elc")):
         try:
             apply_elc(cfg)
         except (OSError, awelc.ElcError) as e:
-            errors.append(f"power button / logo: {e}")
+            errors.append(f"power button / logo / rear: {e}")
     return errors
 
 

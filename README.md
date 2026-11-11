@@ -103,7 +103,7 @@
 
 ### Lighting
 - A drawing of the laptop that lights up with your colours, and flips with an animation to show the lid.
-- Click the keyboard, power button or logo on the drawing to edit it.
+- Four lights: the keyboard, the power button, the lid logo and the **rear light strip**. Click one on the drawing to edit it.
 - Colour wheel, brightness, hex and RGB readout, quick colours.
 - Six keyboard modes: **static, breathing, wave, pulse, colour mix and night rider**. They run on the keyboard itself, so they keep going with the app closed.
 - Colours are re-applied at every login.
@@ -257,6 +257,9 @@ The m15 R7 has two separate USB HID lighting controllers, driven through `/dev/h
 | Keyboard (every key) | Darfon `0d62:dabc` | 64-byte feature reports, report ID `0xCC` ("API v5" in alienfx-tools) |
 | Power button | Alienware AW-ELC `187c:0550`, zone 2 | 33-byte reports |
 | Lid logo | Alienware AW-ELC `187c:0550`, zone 3 | 33-byte reports |
+| Rear light strip | Alienware AW-ELC `187c:0550`, zones 0 and 1 (two halves that blend in the middle) | 33-byte reports |
+
+Zone 4 is the power button's status indicator: setting it makes the button blink, so the app never touches it.
 
 The keyboard sequence was found by testing on the real machine. Set the brightness first, because that command resets the controller. Then leave hardware-effect mode (`80 01 FE`). Then paint the keys (`8C 02 00 [id+1 R G B]…`, `8C 13`, `8B 01 FF`). Painting keys while an effect is active blanks the keyboard.
 

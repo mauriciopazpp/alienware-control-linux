@@ -307,7 +307,8 @@ class LaptopView(Gtk.DrawingArea):
 
     def __init__(self, on_select):
         super().__init__()
-        self.colors = {"keyboard": (0, 160, 255), "power": (0, 160, 255), "logo": (0, 160, 255)}
+        self.colors = {"keyboard": (0, 160, 255), "power": (0, 160, 255), "logo": (0, 160, 255),
+                       "rear": (0, 160, 255)}
         self.effect = "static"
         self.color2 = (138, 60, 255)
         self.selected = "keyboard"
@@ -614,3 +615,19 @@ class LaptopView(Gtk.DrawingArea):
             rounded(cr, 116 + i * 19, 356, 13, 10, 2)
             cr.set_source_rgba(0, 0, 0, 0.55)
             cr.fill()
+
+        # rear light: a strip along the back edge (two halves in hardware, same colour here)
+        rr, rg, rb, _ = self._light("rear")
+        if rr + rg + rb > 0.02:
+            halo = cairo.LinearGradient(0, 376, 0, 420)
+            halo.add_color_stop_rgba(0, rr, rg, rb, 0.45)
+            halo.add_color_stop_rgba(1, rr, rg, rb, 0)
+            cr.set_source(halo)
+            cr.rectangle(60, 376, 480, 44)
+            cr.fill()
+        rounded(cr, 70, 377, 460, 6, 3)
+        cr.set_source_rgba(rr, rg, rb, 1)
+        cr.fill()
+        self.regions["rear"] = (40, 346, 560, 400)
+        if self.selected == "rear":
+            self._outline(cr, pal, 46, 350, 554, 386, 10)

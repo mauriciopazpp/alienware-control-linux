@@ -30,7 +30,7 @@ import theme  # noqa: E402
 from i18n import _  # noqa: E402
 from widgets import ColorWheel, DiskRing, Gauge, LaptopView, rounded  # noqa: E402
 
-VERSION = "0.3.2"
+VERSION = "0.3.3"
 APP_ID = "io.github.alienware_control.AlienwareControl"
 
 
@@ -564,7 +564,8 @@ class Window(Adw.ApplicationWindow):
         side_wrap = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, child=side)
         side_wrap.set_size_request(410, -1)
 
-        self.zone_seg = Segmented([("keyboard", "Keyboard"), ("power", "Power button"), ("logo", "Logo")],
+        self.zone_seg = Segmented([("keyboard", "Keyboard"), ("power", "Power button"), ("logo", "Logo"),
+                                   ("rear", "Rear")],
                                   self.select_zone)
         side.append(self.zone_seg)
 
@@ -625,7 +626,7 @@ class Window(Adw.ApplicationWindow):
         self.effect_box.append(self.color2_box)
         side.append(self.effect_box)
 
-        all_btn = Gtk.Button(label=_("Use this colour on all 3 lights"), margin_top=6)
+        all_btn = Gtk.Button(label=_("Use this colour on all lights"), margin_top=6)
         all_btn.connect("clicked", self.apply_all_clicked)
         side.append(all_btn)
         self.lights_status = label("", "awc-muted", "awc-small", wrap=True)
@@ -658,9 +659,10 @@ class Window(Adw.ApplicationWindow):
         self.zone_seg.select(zone)
         self.laptop.selected = zone
         if rotate:
-            if zone == "logo" and not self.laptop.showing_back:
+            back_zones = ("logo", "rear")
+            if zone in back_zones and not self.laptop.showing_back:
                 self.rotate_laptop(True)
-            elif zone != "logo" and self.laptop.showing_back:
+            elif zone not in back_zones and self.laptop.showing_back:
                 self.rotate_laptop(False)
         state = self.lcfg[zone]
         h, s, _ = colorsys.rgb_to_hsv(*(c / 255 for c in state["color"]))

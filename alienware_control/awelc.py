@@ -10,7 +10,8 @@ Safety:
     are never sent: `send()` refuses anything outside an allow-list;
   * packets are paced, because bursts can hang the controller.
 
-On the Alienware m15 R7: zone 2 = power button, zone 3 = lid logo.
+On the Alienware m15 R7: zones 0-1 = rear light, zone 2 = power button, zone 3 = lid logo,
+zone 4 = power button status indicator (blinks; left alone).
 """
 import errno
 import fcntl

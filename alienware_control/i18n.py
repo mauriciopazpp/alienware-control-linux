@@ -62,6 +62,7 @@ PT = {
     "Keyboard": "Teclado",
     "Power button": "Botão",
     "Logo": "Logo",
+    "Rear": "Traseira",
     "Brightness": "Brilho",
     "Quick colours": "Cores rápidas",
     "Keyboard effect": "Efeito do teclado",
@@ -72,7 +73,7 @@ PT = {
     "Colour mix": "Mistura de cores",
     "Night rider": "Vai e volta",
     "Second colour": "Segunda cor",
-    "Use this colour on all 3 lights": "Usar esta cor nas 3 luzes",
+    "Use this colour on all lights": "Usar esta cor em todas as luzes",
     "No Alienware lighting controller found: preview only.":
         "Nenhum controle de luz Alienware encontrado: só a prévia.",
     "Keyboard lighting controller not found on this computer.":
