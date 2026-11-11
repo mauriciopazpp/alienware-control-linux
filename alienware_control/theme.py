@@ -78,6 +78,7 @@ APP_CSS = """
 .awc-fx:hover { background-color: alpha(currentColor, 0.07); }
 .awc-fx:checked { background-color: alpha(@accent_color, 0.10); border-color: @accent_color;
                   box-shadow: inset 0 0 0 1px @accent_color; color: inherit; }
+.awc-paintbar { padding: 10px 12px; border-radius: 14px; }
 .awc-rotate { border-radius: 999px; min-height: 46px; padding: 0 22px; font-weight: 600; }
 """
 

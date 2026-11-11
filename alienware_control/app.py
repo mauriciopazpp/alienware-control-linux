@@ -538,6 +538,7 @@ class Window(Adw.ApplicationWindow):
         tl.append(self.view_label)
         tl.append(label(_("Click a light on the drawing to edit it"), "awc-muted", "awc-small"))
         overlay.add_overlay(tl)
+        self.view_box = tl
         rotate_btn = Gtk.Button(halign=Gtk.Align.CENTER, valign=Gtk.Align.END, margin_bottom=22)
         rb = Gtk.Box(spacing=10)
         rb.append(Gtk.Image.new_from_gicon(Gio.ThemedIcon.new_from_names(
@@ -548,6 +549,32 @@ class Window(Adw.ApplicationWindow):
         rotate_btn.add_css_class("awc-rotate")
         rotate_btn.connect("clicked", lambda *_: self.rotate_laptop())
         overlay.add_overlay(rotate_btn)
+        # paint mode tools, right next to the drawing
+        self.paint_bar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, halign=Gtk.Align.CENTER,
+                                 valign=Gtk.Align.START, margin_top=14)
+        self.paint_bar.add_css_class("awc-card")
+        self.paint_bar.add_css_class("awc-paintbar")
+        brush_row = Gtk.Box(spacing=6)
+        brush_row.append(label(_("Brush"), "awc-opt-title"))
+        self.brush_btn = self.brush_button()
+        brush_row.append(self.brush_btn)
+        for name, rgb in PRESETS:
+            btn = Gtk.Button(child=Swatch(rgb, 22, 22, 11), tooltip_text=_(name))
+            btn.add_css_class("awc-swatch")
+            btn.add_css_class("flat")
+            btn.connect("clicked", lambda _b, c=rgb: self.brush_set(c))
+            brush_row.append(btn)
+        self.paint_bar.append(brush_row)
+        tools = Gtk.Box(spacing=6, homogeneous=True)
+        self.eraser = Gtk.ToggleButton(label=_("Eraser"))
+        fill = Gtk.Button(label=_("Fill all"))
+        fill.connect("clicked", lambda *_: self.paint_fill(True))
+        clear = Gtk.Button(label=_("Clear"))
+        clear.connect("clicked", lambda *_: self.paint_fill(False))
+        for w in (self.eraser, fill, clear):
+            tools.append(w)
+        self.paint_bar.append(tools)
+        overlay.add_overlay(self.paint_bar)
         page.append(overlay)
 
         side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16, margin_top=20, margin_bottom=20,
@@ -658,19 +685,10 @@ class Window(Adw.ApplicationWindow):
         self.paint_panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.paint_panel.add_css_class("awc-inner")
         self.paint_panel.append(label(_("Paint keys"), "awc-opt-title"))
-        self.paint_panel.append(label(_("Click or drag over the keys of the drawing. The brush uses the "
-                                        "colour picked above."), "awc-muted", "awc-small", wrap=True))
-        self.paint_panel.get_last_child().set_max_width_chars(42)
-        tools = Gtk.Box(spacing=8, homogeneous=True)
-        self.eraser = Gtk.ToggleButton(label=_("Eraser"))
-        fill = Gtk.Button(label=_("Fill all"))
-        fill.connect("clicked", lambda *_: self.paint_fill(True))
-        clear = Gtk.Button(label=_("Clear"))
-        clear.connect("clicked", lambda *_: self.paint_fill(False))
-        for w in (fill, clear):
-            tools.append(w)
-        self.paint_panel.append(self.eraser)
-        self.paint_panel.append(tools)
+        hint = label(_("Pick a brush colour in the bar above the drawing, then click or drag over the keys."),
+                     "awc-muted", "awc-small", wrap=True)
+        hint.set_max_width_chars(42)
+        self.paint_panel.append(hint)
         side.append(self.paint_panel)
         self.paint_pending = {}
         self.paint_source = None
@@ -768,6 +786,34 @@ class Window(Adw.ApplicationWindow):
         btn.set_valign(Gtk.Align.CENTER)
         return btn
 
+    def brush_button(self):
+        if hasattr(Gtk, "ColorDialogButton"):
+            btn = Gtk.ColorDialogButton(dialog=Gtk.ColorDialog(with_alpha=False))
+            btn.connect("notify::rgba", lambda b, _p: self._brush_picked(b.get_rgba()))
+        else:
+            btn = Gtk.ColorButton()
+            btn.connect("color-set", lambda b: self._brush_picked(b.get_rgba()))
+        btn.set_valign(Gtk.Align.CENTER)
+        btn.set_tooltip_text(_("Brush colour"))
+        return btn
+
+    def _brush_picked(self, rgba):
+        if not self._loading:
+            self.brush_set([int(round(c * 255)) for c in (rgba.red, rgba.green, rgba.blue)])
+
+    def brush_set(self, rgb):
+        """Paint mode brush = the keyboard's main colour."""
+        self.lcfg["keyboard"]["color"] = list(rgb)
+        self.eraser.set_active(False)
+        if self.zone == "keyboard":
+            self.load_color_controls()
+        else:
+            self.sync_effect_controls()
+        try:
+            lights.save(self.lcfg)
+        except OSError:
+            pass
+
     def panel_color_changed(self, key, rgba):
         if self._loading:
             return
@@ -793,6 +839,13 @@ class Window(Adw.ApplicationWindow):
         self.speed_box.set_visible(effect.speed)
         painting = self.zone == "keyboard" and effect.key == "paint"
         self.paint_panel.set_visible(painting)
+        self.paint_bar.set_visible(self.lcfg["keyboard"]["effect"] == "paint")
+        self.view_box.set_visible(self.lcfg["keyboard"]["effect"] != "paint")
+        self._loading = True
+        brush = Gdk.RGBA()
+        brush.red, brush.green, brush.blue, brush.alpha = (*(c / 255 for c in self.lcfg["keyboard"]["color"]), 1.0)
+        self.brush_btn.set_rgba(brush)
+        self._loading = False
         self.laptop.paint = self.lcfg["keyboard"]["effect"] == "paint"
         self.laptop.painted = {int(k): tuple(v) for k, v in self.lcfg["keyboard"].get("keys", {}).items()}
         self.color_panel.set_visible(effect.colors == 2)
