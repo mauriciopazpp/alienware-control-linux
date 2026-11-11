@@ -35,11 +35,14 @@ EFFECT_WAVE = 3
 EFFECT_PULSE = 8
 EFFECT_MIX_PULSE = 9   # alternates between two colours
 EFFECT_NIGHT_RIDER = 10
+EFFECT_LASER = 11      # reactive: rays of light shoot out from each key you press
+# Wave (3) sent with the two-colour flag turns into a rainbow wave.
 # Tempo 0x07 is the tested default; 0x0F and 0x03 are the slow/fast choices in the app.
 SPEED_TEMPOS = {"slow": 0x0F, "normal": 0x07, "fast": 0x03}
 _TEMPOS = set(SPEED_TEMPOS.values())
 EFFECT_TEMPOS = {EFFECT_EXIT: {0xFE}, EFFECT_BREATHING: _TEMPOS, EFFECT_WAVE: _TEMPOS,
-                 EFFECT_PULSE: _TEMPOS, EFFECT_MIX_PULSE: _TEMPOS, EFFECT_NIGHT_RIDER: _TEMPOS}
+                 EFFECT_PULSE: _TEMPOS, EFFECT_MIX_PULSE: _TEMPOS, EFFECT_NIGHT_RIDER: _TEMPOS,
+                 EFFECT_LASER: _TEMPOS}
 
 
 class KbdError(Exception):

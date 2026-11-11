@@ -80,6 +80,7 @@ PT = {
         "O LED do botão de ligar não tem azul: ele mostra vermelho, verde e as misturas (amarelo, laranja), "
         "e troca de cor em degraus.",
     "Blink": "Piscar",
+    "Stars (typing)": "Estrelas (ao digitar)",
     "Traffic light": "Semáforo",
     "Effect": "Efeito",
     "hover to preview": "passe o mouse para ver",
