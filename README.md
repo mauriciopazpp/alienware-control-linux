@@ -324,7 +324,7 @@ On some hybrid-graphics laptops the NVIDIA GPU never sleeps because its HDMI aud
 ## Security
 
 - **Root access** is limited to the two helper scripts. They take fixed setting names, check every value against what the BIOS reports, and are the only commands the polkit policy allows. Reading is passwordless only for the active local session; every change asks for the admin password.
-- **Lighting access:** the udev rule gives the user at the computer (the active seat) access to the two lighting devices, USB interface 0 only. Any program running as that user can talk to them, not only this app. The keyboard device also carries keystrokes, which is no new exposure on X11, where any app can already read the keyboard. The allow-lists in `awkbd.py` and `awelc.py` protect against bugs in this app, not against other malicious software running as you. Skip the udev rule if that matters to you: lighting stops working and everything else keeps working.
+- **Lighting access:** the udev rule gives the user at the computer (the active seat) access to the two lighting devices. Any program running as that user can talk to them, not only this app. The keyboard device also carries keystrokes, which is no new exposure on X11, where any app can already read the keyboard. The allow-lists in `awkbd.py` and `awelc.py` protect against bugs in this app, not against other malicious software running as you. Skip the udev rule if that matters to you: lighting stops working and everything else keeps working.
 - **Without systemd-logind or elogind** (seatd-only setups), `uaccess` does nothing. Replace `TAG+="uaccess"` with `GROUP="input", MODE="0660"` in `/etc/udev/rules.d/70-alienware-control.rules` and add yourself to that group.
 
 ## Help with other models

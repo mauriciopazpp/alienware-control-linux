@@ -30,7 +30,7 @@ import theme  # noqa: E402
 from i18n import _  # noqa: E402
 from widgets import ColorWheel, DiskRing, Gauge, LaptopView, rounded  # noqa: E402
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 APP_ID = "io.github.alienware_control.AlienwareControl"
 
 

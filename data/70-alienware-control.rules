@@ -1,7 +1,9 @@
 # Alienware Control: let the logged-in user drive the lighting controllers.
 # Must sort before 73-seat-late.rules, which turns the "uaccess" tag into an ACL.
+# Note: every ATTRS{} key in a rule must match on the same parent device, so the
+# vendor/product match cannot be combined with ATTRS{bInterfaceNumber} (interface level).
 
 # AW-ELC lighting controller (power button, lid logo)
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="187c", ATTRS{idProduct}=="0550", ATTRS{bInterfaceNumber}=="00", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="187c", ATTRS{idProduct}=="0550", TAG+="uaccess"
 # Per-key RGB keyboard (Darfon) used by recent Alienware laptops
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0d62", ATTRS{idProduct}=="dabc", ATTRS{bInterfaceNumber}=="00", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0d62", ATTRS{idProduct}=="dabc", TAG+="uaccess"
