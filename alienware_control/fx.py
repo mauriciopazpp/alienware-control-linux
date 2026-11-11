@@ -49,6 +49,7 @@ CATALOG = [
     Effect("stars", "Stars (typing)", ("keyboard",), 1, False),
     Effect("ripple", "Ripple (typing)", ("keyboard",), 2, False),
     Effect("stripes", "Colour stripes", ("keyboard",), 0, False),
+    Effect("paint", "Paint keys", ("keyboard",), 1, False),
     Effect("duo", "Colour shift", ELC, 2, True),
     Effect("signal", "Traffic light", ("power",), 0, True),
     Effect("spectrum", "Spectrum", FADING, 0, True),
@@ -153,6 +154,8 @@ def sample(zone, key, c1, c2, seconds, speed="normal", u=0.5):
             return _mix(c2, c1, ring * (1 - age / 1.1) ** 0.6 if age < 1.1 else 0.0)
         if key == "stripes":
             return STRIPES[int(u * 12) % len(STRIPES)]
+        if key == "paint":  # a few painted keys on a dark keyboard
+            return c1 if int(u * 12) in (2, 3, 4, 7, 9) else _mix(BLACK, c1, 0.06)
         if key == "stars":  # a few keys twinkle, as if someone were typing
             cell = int(u * 12)
             beat = int(t * 3)

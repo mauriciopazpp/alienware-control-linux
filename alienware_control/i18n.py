@@ -86,6 +86,12 @@ PT = {
     "Stars (typing)": "Estrelas (ao digitar)",
     "Ripple (typing)": "Gota (ao digitar)",
     "Colour stripes": "Faixas coloridas",
+    "Paint keys": "Pintar teclas",
+    "Click or drag over the keys of the drawing. The brush uses the colour picked above.":
+        "Clique ou arraste sobre as teclas do desenho. O pincel usa a cor escolhida acima.",
+    "Eraser": "Borracha",
+    "Fill all": "Preencher tudo",
+    "Clear": "Limpar",
     "Traffic light": "Semáforo",
     "Effect": "Efeito",
     "hover to preview": "passe o mouse para ver",

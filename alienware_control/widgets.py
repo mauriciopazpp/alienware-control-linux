@@ -282,6 +282,18 @@ KEY_ROWS = [
 ]
 
 
+# Light ids under each key of the drawing (see keymap.py). The drawing is a generic laptop,
+# so a few real keys share one drawn key.
+KEY_IDS = [
+    [[120 + i] for i in range(16)],
+    [[20 + i] for i in range(13)] + [[35, 139]],
+    [[40]] + [[42 + i] for i in range(12)] + [[54, 136]],
+    [[61]] + [[62 + i] for i in range(10)] + [[72, 73, 138]],
+    [[81, 82]] + [[83 + i] for i in range(10)] + [[94, 114, 137]],
+    [[100], [101], [103], [104], [105, 106, 107, 108, 110], [111], [109], [112], [141], [142, 143]],
+]
+
+
 def lerp(a, b, t):
     return a + (b - a) * t
 
@@ -311,6 +323,12 @@ class LaptopView(Gtk.DrawingArea):
         base = {"effect": "static", "color": (0, 160, 255), "color2": (138, 60, 255), "speed": "normal"}
         self.zones = {z: dict(base) for z in ("keyboard", "power", "logo", "rear")}
         self.selected = "keyboard"
+        self.paint = False      # paint mode: keys show `painted` and can be clicked or dragged over
+        self.painted = {}       # light id -> (r, g, b)
+        self.on_paint = None    # callback(list of light ids)
+        self.key_quads = []
+        self._last_painted = None
+        self._drag_origin = (0, 0)
         self.flip = 0.0  # 0 = front, 1 = back
         self.seconds = 0.0
         self._last_frame = 0
@@ -326,6 +344,10 @@ class LaptopView(Gtk.DrawingArea):
         click = Gtk.GestureClick()
         click.connect("released", self._click)
         self.add_controller(click)
+        drag = Gtk.GestureDrag()
+        drag.connect("drag-begin", self._drag_begin)
+        drag.connect("drag-update", self._drag_update)
+        self.add_controller(drag)
 
     @property
     def showing_back(self):
@@ -371,12 +393,44 @@ class LaptopView(Gtk.DrawingArea):
         s = min(w / self.W, h / self.H)
         return s, (w - self.W * s) / 2, (h - self.H * s) / 2
 
-    def _click(self, gesture, n, x, y):
+    def _to_drawing(self, x, y):
         s, ox, oy = self._transform(self.get_width(), self.get_height())
         sx = abs(math.cos(math.pi * self.flip)) or 1e-3
         mx = (x - ox) / s
-        mx = self.W / 2 + (mx - self.W / 2) / sx
-        my = (y - oy) / s
+        return self.W / 2 + (mx - self.W / 2) / sx, (y - oy) / s
+
+    def _key_at(self, mx, my):
+        for pts, ids in self.key_quads:
+            inside = True
+            for i in range(4):
+                (x0, y0), (x1, y1) = pts[i], pts[(i + 1) % 4]
+                if (x1 - x0) * (my - y0) - (y1 - y0) * (mx - x0) < 0:
+                    inside = False
+                    break
+            if inside:
+                return ids
+        return None
+
+    def _paint_at(self, x, y):
+        if not (self.paint and self.on_paint) or self.showing_back:
+            return
+        ids = self._key_at(*self._to_drawing(x, y))
+        if ids and ids is not self._last_painted:
+            self._last_painted = ids
+            self.on_paint(ids)
+
+    def _drag_begin(self, gesture, x, y):
+        self._drag_origin = (x, y)
+        self._last_painted = None
+        self._paint_at(x, y)
+
+    def _drag_update(self, gesture, dx, dy):
+        self._paint_at(self._drag_origin[0] + dx, self._drag_origin[1] + dy)
+
+    def _click(self, gesture, n, x, y):
+        mx, my = self._to_drawing(x, y)
+        if self.paint and not self.showing_back and self._key_at(mx, my):
+            return  # painting, not selecting
         for zone, (x0, y0, x1, y1) in self.regions.items():
             if x0 <= mx <= x1 and y0 <= my <= y1:
                 self.on_select(zone)
@@ -480,20 +534,27 @@ class LaptopView(Gtk.DrawingArea):
         # keyboard
         kq = [(96, 330), (504, 330), (522, 418), (78, 418)]
         kst = self.zones["keyboard"]
-        lit = max(kst["color"]) > 4
+        lit = max(kst["color"]) > 4 or self.paint
         light = self._light("keyboard")
+        self.key_quads = []
         total_h = sum(r[0] for r in KEY_ROWS)
         gap_u, gap_v = 0.006, 0.035
         v = 0.0
-        for row_h, keys in KEY_ROWS:
+        for ri, (row_h, keys) in enumerate(KEY_ROWS):
             vh = row_h / total_h
             total_w = sum(keys)
             u = 0.0
-            for kw in keys:
+            for ki, kw in enumerate(keys):
                 uw = kw / total_w
                 kl = self._light("keyboard", u + uw / 2) if lit else light
+                if self.paint:
+                    rgb = self.painted.get(KEY_IDS[ri][ki][0], (0, 0, 0))
+                    peak = max(rgb)
+                    kl = (rgb[0] / peak, rgb[1] / peak, rgb[2] / peak, 0.25 + 0.75 * peak / 255) if peak > 3 \
+                        else (0.5, 0.5, 0.5, 0.12)
                 pts = [quad_point(kq, u + gap_u, v + gap_v), quad_point(kq, u + uw - gap_u, v + gap_v),
                        quad_point(kq, u + uw - gap_u, v + vh - gap_v), quad_point(kq, u + gap_u, v + vh - gap_v)]
+                self.key_quads.append((pts, KEY_IDS[ri][ki]))
                 quad_path(cr, pts)
                 cr.set_source_rgba(*theme.mix(pal["bg"], (0, 0, 0, 1), 0.3))
                 cr.fill_preserve()
@@ -507,7 +568,7 @@ class LaptopView(Gtk.DrawingArea):
                 cr.stroke()
                 u += uw
             v += vh
-        if lit:  # glow under the keys
+        if lit and not self.paint:  # glow under the keys
             glow = cairo.RadialGradient(300, 374, 10, 300, 374, 260)
             glow.add_color_stop_rgba(0, light[0], light[1], light[2], 0.16 * light[3])
             glow.add_color_stop_rgba(1, light[0], light[1], light[2], 0)

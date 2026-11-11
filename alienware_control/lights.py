@@ -68,6 +68,9 @@ def load():
             cfg[zone]["effect"] = effect
         if values.get("speed") in SPEEDS:
             cfg[zone]["speed"] = values["speed"]
+        if zone == "keyboard" and isinstance(values.get("keys"), dict):  # painted keys
+            cfg[zone]["keys"] = {k: v for k, v in values["keys"].items()
+                                 if k.isdigit() and int(k) in keymap.POS and _valid_color(v)}
     return cfg
 
 
@@ -99,9 +102,12 @@ def apply_keyboard(state):
         rgb = tuple(state["color"])
         effect = HW_EFFECTS.get(state.get("effect"))
         tempo = awkbd.SPEED_TEMPOS.get(state.get("speed"), 0x07)
-        if state.get("effect") in ("ripple", "stripes"):  # per-key looks
+        if state.get("effect") in ("ripple", "stripes", "paint"):  # per-key looks
             kbd.set_effect(awkbd.EFFECT_EXIT, 0xFE, (0, 0, 0))
-            if state["effect"] == "ripple":  # resting colour; ripple.py draws the rings
+            if state["effect"] == "paint":
+                keys = state.get("keys", {})
+                kbd.set_colors([(k, tuple(keys.get(str(k), (0, 0, 0)))) for k in KEYBOARD_KEYS])
+            elif state["effect"] == "ripple":  # resting colour; ripple.py draws the rings
                 kbd.set_colors([(k, tuple(state["color2"])) for k in KEYBOARD_KEYS])
             else:
                 kbd.set_colors([(k, keymap.stripe_color(k)) for k in KEYBOARD_KEYS])
@@ -118,6 +124,16 @@ def apply_keyboard(state):
         else:
             kbd.set_effect(awkbd.EFFECT_EXIT, 0xFE, (0, 0, 0))
             kbd.set_colors([(k, rgb) for k in KEYBOARD_KEYS])
+
+
+def paint_keys(items):
+    """Repaint a few keys right away (paint mode): [(light id, (r, g, b)), ...]."""
+    try:
+        with awkbd.Keyboard() as kbd:
+            kbd.update_colors(items)
+        return []
+    except (OSError, awkbd.KbdError) as e:
+        return [f"keyboard: {e}"]
 
 
 def start_ripple(cfg):

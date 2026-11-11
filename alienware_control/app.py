@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -25,6 +26,7 @@ import awkbd  # noqa: E402
 import diskwatch  # noqa: E402
 import fx  # noqa: E402
 import i18n  # noqa: E402
+import keymap  # noqa: E402
 import lights  # noqa: E402
 import sensors  # noqa: E402
 import theme  # noqa: E402
@@ -32,7 +34,7 @@ from i18n import _  # noqa: E402
 from widgets import (ColorWheel, DiskRing, EffectPreview, Gauge, LaptopView,  # noqa: E402
                      SceneSwatch, rounded)
 
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 APP_ID = "io.github.alienware_control.AlienwareControl"
 
 
@@ -652,6 +654,29 @@ class Window(Adw.ApplicationWindow):
             self.panel_labels[key], self.panel_buttons[key] = lb, btn
         side.append(self.color_panel)
 
+        # paint mode: brush tools
+        self.paint_panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.paint_panel.add_css_class("awc-inner")
+        self.paint_panel.append(label(_("Paint keys"), "awc-opt-title"))
+        self.paint_panel.append(label(_("Click or drag over the keys of the drawing. The brush uses the "
+                                        "colour picked above."), "awc-muted", "awc-small", wrap=True))
+        self.paint_panel.get_last_child().set_max_width_chars(42)
+        tools = Gtk.Box(spacing=8, homogeneous=True)
+        self.eraser = Gtk.ToggleButton(label=_("Eraser"))
+        fill = Gtk.Button(label=_("Fill all"))
+        fill.connect("clicked", lambda *_: self.paint_fill(True))
+        clear = Gtk.Button(label=_("Clear"))
+        clear.connect("clicked", lambda *_: self.paint_fill(False))
+        for w in (fill, clear):
+            tools.append(w)
+        self.paint_panel.append(self.eraser)
+        self.paint_panel.append(tools)
+        side.append(self.paint_panel)
+        self.paint_pending = {}
+        self.paint_source = None
+        self.paint_lock = threading.Lock()
+        self.laptop.on_paint = self.paint_keys
+
         self.speed_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.speed_box.append(label(_("Speed"), "awc-opt-title"))
         self.speed_seg = Segmented(SPEED_NAMES, self.speed_changed)
@@ -766,6 +791,10 @@ class Window(Adw.ApplicationWindow):
             btn.set_rgba(rgba)
         self._loading = False
         self.speed_box.set_visible(effect.speed)
+        painting = self.zone == "keyboard" and effect.key == "paint"
+        self.paint_panel.set_visible(painting)
+        self.laptop.paint = self.lcfg["keyboard"]["effect"] == "paint"
+        self.laptop.painted = {int(k): tuple(v) for k, v in self.lcfg["keyboard"].get("keys", {}).items()}
         self.color_panel.set_visible(effect.colors == 2)
         self.panel_title.set_label(_("{effect} options").format(effect=_(effect.label)))
         names = (("Ring colour", "Resting keys colour") if effect.key == "ripple"
@@ -792,6 +821,47 @@ class Window(Adw.ApplicationWindow):
         self.sync_effect_controls()
         self.update_color_info()
         self.schedule_apply(self.zone)
+
+    # ----- paint mode -----
+
+    def paint_keys(self, ids):
+        """Called by the drawing while the pointer is over a key in paint mode."""
+        keys = self.lcfg["keyboard"].setdefault("keys", {})
+        color = None if self.eraser.get_active() else list(self.lcfg["keyboard"]["color"])
+        for light in ids:
+            if color is None:
+                keys.pop(str(light), None)
+                self.laptop.painted.pop(light, None)
+            else:
+                keys[str(light)] = color
+                self.laptop.painted[light] = tuple(color)
+            self.paint_pending[light] = tuple(color or (0, 0, 0))
+        self.laptop.queue_draw()
+        if self.paint_source is None:
+            self.paint_source = GLib.timeout_add(70, self._paint_flush)
+
+    def _paint_flush(self):
+        self.paint_source = None
+        items, self.paint_pending = list(self.paint_pending.items()), {}
+        try:
+            lights.save(self.lcfg)
+        except OSError:
+            pass
+        if items and self.has_kbd:
+            def send():
+                with self.paint_lock:
+                    errors = lights.paint_keys(items)
+                if errors:
+                    GLib.idle_add(self._lights_done, errors)
+            threading.Thread(target=send, daemon=True).start()
+        return False
+
+    def paint_fill(self, filled):
+        kb = self.lcfg["keyboard"]
+        kb["keys"] = {str(i): list(kb["color"]) for i in keymap.IDS} if filled else {}
+        self.sync_effect_controls()
+        self.laptop.queue_draw()
+        self.schedule_apply("keyboard")
 
     def speed_changed(self, speed):
         if self._loading:
