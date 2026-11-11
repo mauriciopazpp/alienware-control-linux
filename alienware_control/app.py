@@ -743,6 +743,9 @@ class Window(Adw.ApplicationWindow):
         if self._loading or not btn.get_active():
             return
         self.lcfg[self.zone]["effect"] = key
+        if key == "ripple":
+            # The ring only shows against dark keys: start with a dim version of colour 1.
+            self.lcfg[self.zone]["color2"] = [int(c * 0.12) for c in self.lcfg[self.zone]["color"]]
         if fx.BY_KEY[key].colors < 2 and self.slot != "color":
             self.slot = "color"
             self.load_color_controls()
