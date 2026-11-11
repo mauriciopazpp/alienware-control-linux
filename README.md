@@ -28,8 +28,15 @@
 </p>
 
 > [!IMPORTANT]
-> **Tested on one machine only:** an **Alienware m15 R7** (Intel Core i7-12700H, NVIDIA GeForce RTX 3070 Ti Laptop GPU, per-key RGB keyboard, BIOS 1.41.0) running **Zorin OS 17.3** (Ubuntu 22.04 base), kernel 6.8, GNOME 43, GTK 4.10 and libadwaita 1.3.
-> The dashboard works on any Linux computer. Lighting and BIOS settings depend on the exact hardware, so on other Alienware models they may work partly or not at all. [Reports are welcome](#help-with-other-models).
+> ### Tested only on an Alienware m15 R7
+> Developed and tested on a single machine: an **Alienware m15 R7** (Intel Core i7-12700H, NVIDIA GeForce RTX 3070 Ti Laptop GPU, per-key RGB keyboard, BIOS 1.41.0) running **Zorin OS 17.3** (Ubuntu 22.04 base), kernel 6.8, GNOME 43, GTK 4.10 and libadwaita 1.3.
+> The dashboard works on any Linux computer. Lighting and BIOS settings depend on the exact hardware, so on other models they may work partly, not at all, or behave differently. [Reports are welcome](#help-with-other-models).
+
+> [!CAUTION]
+> ### Use at your own risk
+> This software talks directly to your laptop's lighting controllers and changes **BIOS settings** (thermal mode, Turbo Boost, battery charging). It is provided **"as is", without warranty of any kind**, express or implied.
+> **By installing or using it, you take full responsibility** for any consequences. The author is not liable for any damage to your hardware, loss of data, voided warranty or any other problem resulting from its use.
+> It is an unofficial project, not affiliated with, endorsed by or supported by Dell or Alienware. If you are not comfortable with these risks, do not install it.
 
 ## Screenshots
 
@@ -345,6 +352,10 @@ The lighting protocols were worked out with help from [alienfx-tools](https://gi
 
 Not affiliated with, endorsed by or supported by Dell or Alienware. "Alienware" is a trademark of Dell Inc. The lid emblem in the app is a generic drawing, not the Alienware logo.
 
+## Disclaimer
+
+This project is provided "as is", without warranty of any kind. You use it entirely at your own risk and are solely responsible for any damage to your computer, its battery, its firmware settings or your data, and for any effect on your manufacturer warranty. Always make sure you know how to reset your BIOS settings (F2 at boot, then "Restore Settings") before changing them from any tool.
+
 ## License
 
-[MIT](LICENSE) © 2026 Mauricio Paz
+[MIT](LICENSE) © 2026 Mauricio Paz. See the license for the full warranty disclaimer.
