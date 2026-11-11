@@ -72,6 +72,12 @@ APP_CSS = """
 .awc-swatch { min-width: 30px; min-height: 30px; border-radius: 999px; padding: 0;
               border: 2px solid alpha(currentColor, 0.15); }
 .awc-swatch:hover { border-color: alpha(currentColor, 0.5); }
+.awc-seg-compact > button { font-size: 13px; padding: 0 4px; }
+.awc-fx { border-radius: 12px; padding: 8px 4px; background-color: alpha(currentColor, 0.03);
+          border: 1px solid alpha(currentColor, 0.08); box-shadow: none; }
+.awc-fx:hover { background-color: alpha(currentColor, 0.07); }
+.awc-fx:checked { background-color: alpha(@accent_color, 0.10); border-color: @accent_color;
+                  box-shadow: inset 0 0 0 1px @accent_color; color: inherit; }
 .awc-rotate { border-radius: 999px; min-height: 46px; padding: 0 22px; font-weight: 600; }
 """
 

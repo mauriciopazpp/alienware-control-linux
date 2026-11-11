@@ -9,8 +9,9 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
-from gi.repository import Adw, Gtk, Pango, PangoCairo  # noqa: E402
+from gi.repository import Adw, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
+import fx  # noqa: E402
 import theme  # noqa: E402
 
 FONT = "Inter, Cantarell, Noto Sans, Sans"
@@ -307,13 +308,12 @@ class LaptopView(Gtk.DrawingArea):
 
     def __init__(self, on_select):
         super().__init__()
-        self.colors = {"keyboard": (0, 160, 255), "power": (0, 160, 255), "logo": (0, 160, 255),
-                       "rear": (0, 160, 255)}
-        self.effect = "static"
-        self.color2 = (138, 60, 255)
+        base = {"effect": "static", "color": (0, 160, 255), "color2": (138, 60, 255), "speed": "normal"}
+        self.zones = {z: dict(base) for z in ("keyboard", "power", "logo", "rear")}
         self.selected = "keyboard"
         self.flip = 0.0  # 0 = front, 1 = back
-        self.phase = 0.0
+        self.seconds = 0.0
+        self._last_frame = 0
         self.on_select = on_select
         self.regions = {}
         self.anim = None
@@ -346,21 +346,25 @@ class LaptopView(Gtk.DrawingArea):
         self.flip = v
         self.queue_draw()
 
-    def set_effect(self, effect, color2=None):
-        self.effect = effect
-        if color2 is not None:
-            self.color2 = tuple(color2)
-        on = effect != "static"
-        if on and self.tick_id is None:
+    def set_state(self, zones):
+        """zones: {zone: {"effect", "color", "color2", "speed"}}, colours already dimmed."""
+        for zone, st in zones.items():
+            self.zones[zone] = {"effect": st["effect"], "color": tuple(st["color"]),
+                                "color2": tuple(st["color2"]), "speed": st["speed"]}
+        animated = any(st["effect"] != "static" for st in self.zones.values())
+        if animated and self.tick_id is None:
             self.tick_id = self.add_tick_callback(self._tick)
-        elif not on and self.tick_id is not None:
+        elif not animated and self.tick_id is not None:
             self.remove_tick_callback(self.tick_id)
             self.tick_id = None
         self.queue_draw()
 
     def _tick(self, widget, clock):
-        self.phase = (clock.get_frame_time() / 1e6) % 3.2 / 3.2
-        self.queue_draw()
+        now = clock.get_frame_time()
+        if now - self._last_frame >= 40000:  # about 25 fps is plenty, and keeps the CPU cool
+            self._last_frame = now
+            self.seconds = now / 1e6
+            self.queue_draw()
         return True
 
     def _transform(self, w, h):
@@ -408,28 +412,14 @@ class LaptopView(Gtk.DrawingArea):
             cr.rectangle(self.W / 2 - self.W / 2 * abs(sx), 0, self.W * abs(sx), self.H)
             cr.fill()
 
-    def _light(self, zone):
-        r, g, b = (c / 255 for c in self.colors[zone])
-        return (r, g, b, 1.0)
-
-    def _key_light(self, u):
-        """Colour and intensity of a key whose centre sits at u (0 = left edge, 1 = right edge)."""
-        r, g, b = (c / 255 for c in self.colors["keyboard"])
-        p, tau = self.phase, 2 * math.pi
-        if self.effect == "breathing":
-            return (r, g, b, 0.15 + 0.85 * (0.5 - 0.5 * math.cos(tau * p)))
-        if self.effect == "wave":
-            return (r, g, b, 0.12 + 0.88 * max(0.0, math.cos(tau * (u - 2 * p))) ** 3)
-        if self.effect == "pulse":
-            return (r, g, b, 1.0 if (p * 4) % 1 < 0.5 else 0.08)
-        if self.effect == "mix":
-            t = 0.5 - 0.5 * math.cos(tau * p)
-            r2, g2, b2 = (c / 255 for c in self.color2)
-            return (lerp(r, r2, t), lerp(g, g2, t), lerp(b, b2, t), 1.0)
-        if self.effect == "nightrider":
-            pos = 1 - abs((2 * p) % 2 - 1)  # back and forth
-            return (r, g, b, 0.06 + 0.94 * math.exp(-((u - pos) / 0.09) ** 2))
-        return (r, g, b, 1.0)
+    def _light(self, zone, u=0.5):
+        """(r, g, b, intensity): hue at full strength plus how bright it is right now."""
+        st = self.zones[zone]
+        rgb = fx.sample(zone, st["effect"], st["color"], st["color2"], self.seconds, st["speed"], u)
+        peak = max(rgb)
+        if peak < 1:
+            return (0.0, 0.0, 0.0, 0.0)
+        return (rgb[0] / peak, rgb[1] / peak, rgb[2] / peak, peak / 255)
 
     def _outline(self, cr, pal, x0, y0, x1, y1, radius):
         cr.save()
@@ -489,8 +479,9 @@ class LaptopView(Gtk.DrawingArea):
 
         # keyboard
         kq = [(96, 330), (504, 330), (522, 418), (78, 418)]
+        kst = self.zones["keyboard"]
+        lit = max(kst["color"]) > 4
         light = self._light("keyboard")
-        lit = sum(light[:3]) > 0.02
         total_h = sum(r[0] for r in KEY_ROWS)
         gap_u, gap_v = 0.006, 0.035
         v = 0.0
@@ -500,7 +491,7 @@ class LaptopView(Gtk.DrawingArea):
             u = 0.0
             for kw in keys:
                 uw = kw / total_w
-                kl = self._key_light(u + uw / 2) if lit else light
+                kl = self._light("keyboard", u + uw / 2) if lit else light
                 pts = [quad_point(kq, u + gap_u, v + gap_v), quad_point(kq, u + uw - gap_u, v + gap_v),
                        quad_point(kq, u + uw - gap_u, v + vh - gap_v), quad_point(kq, u + gap_u, v + vh - gap_v)]
                 quad_path(cr, pts)
@@ -532,13 +523,13 @@ class LaptopView(Gtk.DrawingArea):
         rounded(cr, 476, 313, 32, 10, 5)
         cr.set_source_rgba(*theme.mix(pal["bg"], (0, 0, 0, 1), 0.3))
         cr.fill_preserve()
-        cr.set_source_rgba(p[0], p[1], p[2], 0.35)
+        cr.set_source_rgba(p[0], p[1], p[2], 0.35 * p[3])
         cr.fill_preserve()
-        cr.set_source_rgba(p[0], p[1], p[2], 1)
+        cr.set_source_rgba(p[0], p[1], p[2], p[3])
         cr.set_line_width(1.6)
         cr.stroke()
         halo = cairo.RadialGradient(492, 318, 2, 492, 318, 30)
-        halo.add_color_stop_rgba(0, p[0], p[1], p[2], 0.45)
+        halo.add_color_stop_rgba(0, p[0], p[1], p[2], 0.45 * p[3])
         halo.add_color_stop_rgba(1, p[0], p[1], p[2], 0)
         cr.set_source(halo)
         cr.arc(492, 318, 30, 0, 2 * math.pi)
@@ -576,10 +567,10 @@ class LaptopView(Gtk.DrawingArea):
         cr.stroke()
 
         # generic emblem (hexagonal shield) lit with the logo colour
-        lr, lg, lb, _ = self._light("logo")
+        lr, lg, lb, lk = self._light("logo")
         cx, cy = 300, 190
         glow = cairo.RadialGradient(cx, cy, 5, cx, cy, 120)
-        glow.add_color_stop_rgba(0, lr, lg, lb, 0.40)
+        glow.add_color_stop_rgba(0, lr, lg, lb, 0.40 * lk)
         glow.add_color_stop_rgba(1, lr, lg, lb, 0)
         cr.set_source(glow)
         cr.arc(cx, cy, 120, 0, 2 * math.pi)
@@ -591,15 +582,15 @@ class LaptopView(Gtk.DrawingArea):
 
         for width, alpha in ((9, 0.18), (5, 0.35)):
             quad_path(cr, hexa(42, 6))
-            cr.set_source_rgba(lr, lg, lb, alpha)
+            cr.set_source_rgba(lr, lg, lb, alpha * lk)
             cr.set_line_width(width)
             cr.stroke()
         quad_path(cr, hexa(42, 6))
-        cr.set_source_rgba(lr, lg, lb, 1)
+        cr.set_source_rgba(lr, lg, lb, 0.12 + 0.88 * lk)
         cr.set_line_width(3)
         cr.stroke()
         quad_path(cr, hexa(22, 4))
-        cr.set_source_rgba(lr, lg, lb, 0.9)
+        cr.set_source_rgba(lr, lg, lb, 0.9 * lk)
         cr.fill()
         self.regions["logo"] = (cx - 50, cy - 52, cx + 50, cy + 56)
         if self.selected == "logo":
@@ -616,18 +607,89 @@ class LaptopView(Gtk.DrawingArea):
             cr.set_source_rgba(0, 0, 0, 0.55)
             cr.fill()
 
-        # rear light: a strip along the back edge (two halves in hardware, same colour here)
-        rr, rg, rb, _ = self._light("rear")
-        if rr + rg + rb > 0.02:
-            halo = cairo.LinearGradient(0, 376, 0, 420)
-            halo.add_color_stop_rgba(0, rr, rg, rb, 0.45)
-            halo.add_color_stop_rgba(1, rr, rg, rb, 0)
-            cr.set_source(halo)
-            cr.rectangle(60, 376, 480, 44)
+        # rear light: a strip along the back edge, two halves that blend in the middle
+        segments = 24
+        for i in range(segments):
+            rr, rg, rb, rk = self._light("rear", (i + 0.5) / segments)
+            x = 70 + 460 * i / segments
+            if rk > 0.02:
+                halo = cairo.LinearGradient(0, 376, 0, 420)
+                halo.add_color_stop_rgba(0, rr, rg, rb, 0.45 * rk)
+                halo.add_color_stop_rgba(1, rr, rg, rb, 0)
+                cr.set_source(halo)
+                cr.rectangle(x, 376, 460 / segments + 0.6, 44)
+                cr.fill()
+            cr.set_source_rgba(rr, rg, rb, 0.10 + 0.90 * rk)
+            cr.rectangle(x, 377, 460 / segments + 0.6, 6)
             cr.fill()
-        rounded(cr, 70, 377, 460, 6, 3)
-        cr.set_source_rgba(rr, rg, rb, 1)
-        cr.fill()
         self.regions["rear"] = (40, 346, 560, 400)
         if self.selected == "rear":
             self._outline(cr, pal, 46, 350, 554, 386, 10)
+
+
+# ---------- effect previews ----------
+
+class EffectPreview(Gtk.DrawingArea):
+    """A small strip that shows what an effect looks like; animates while `playing`."""
+
+    def __init__(self, zone, key, width=104, height=30):
+        super().__init__()
+        self.zone, self.key = zone, key
+        self.c1, self.c2, self.speed = (0, 160, 255), (138, 60, 255), "normal"
+        self.seconds = 0.6
+        self.timer = None
+        self.set_content_width(width)
+        self.set_content_height(height)
+        self.set_draw_func(self.draw)
+        self.connect("unmap", lambda *_: self.play(False))
+
+    def set_colors(self, c1, c2, speed):
+        self.c1, self.c2, self.speed = tuple(c1), tuple(c2), speed
+        self.queue_draw()
+
+    def play(self, on):
+        if on and self.timer is None:
+            self.timer = GLib.timeout_add(66, self._step)
+        elif not on and self.timer is not None:
+            GLib.source_remove(self.timer)
+            self.timer = None
+
+    def _step(self):
+        self.seconds += 0.066
+        self.queue_draw()
+        return True
+
+    def draw(self, area, cr, w, h):
+        n = 12 if self.zone in ("keyboard", "rear") else 1
+        gap = 2 if self.zone == "keyboard" else 0
+        cr.save()
+        rounded(cr, 0, 0, w, h, 8)
+        cr.clip()
+        cr.set_source_rgb(0.03, 0.04, 0.06)
+        cr.paint()
+        for i in range(n):
+            r, g, b = fx.sample(self.zone, self.key, self.c1, self.c2, self.seconds, self.speed, (i + 0.5) / n)
+            cr.set_source_rgb(r / 255, g / 255, b / 255)
+            cr.rectangle(i * w / n + gap / 2, 0, w / n - gap + 0.6, h)
+            cr.fill()
+        cr.restore()
+
+
+class SceneSwatch(Gtk.DrawingArea):
+    """Four colour stops side by side: a scene's keyboard, power, logo and rear colours."""
+
+    def __init__(self, colors, width=60, height=20):
+        super().__init__()
+        self.colors = colors
+        self.set_content_width(width)
+        self.set_content_height(height)
+        self.set_draw_func(self.draw)
+
+    def draw(self, area, cr, w, h):
+        rounded(cr, 0, 0, w, h, h / 2)
+        cr.clip()
+        grad = cairo.LinearGradient(0, 0, w, 0)
+        for i, (r, g, b) in enumerate(self.colors):
+            grad.add_color_stop_rgb(i / max(1, len(self.colors) - 1), r / 255, g / 255, b / 255)
+        cr.set_source(grad)
+        cr.paint()

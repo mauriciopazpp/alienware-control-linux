@@ -23,14 +23,16 @@ from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 import awelc  # noqa: E402
 import awkbd  # noqa: E402
 import diskwatch  # noqa: E402
+import fx  # noqa: E402
 import i18n  # noqa: E402
 import lights  # noqa: E402
 import sensors  # noqa: E402
 import theme  # noqa: E402
 from i18n import _  # noqa: E402
-from widgets import ColorWheel, DiskRing, Gauge, LaptopView, rounded  # noqa: E402
+from widgets import (ColorWheel, DiskRing, EffectPreview, Gauge, LaptopView,  # noqa: E402
+                     SceneSwatch, rounded)
 
-VERSION = "0.3.3"
+VERSION = "0.4.0"
 APP_ID = "io.github.alienware_control.AlienwareControl"
 
 
@@ -71,6 +73,23 @@ PRESETS = [
     ("Orange", (255, 110, 0)), ("Green", (0, 255, 90)), ("Pink", (255, 60, 200)),
     ("Blue", (0, 80, 255)), ("Cool white", (200, 225, 255)),
 ]
+CYAN, VIOLET, WHITE = (62, 232, 255), (138, 92, 255), (200, 225, 255)
+# name, {light: (effect, colour, colour 2)}, brightness
+SCENES = [
+    ("Neon", {"keyboard": ("wave", CYAN, VIOLET), "power": ("breathing", CYAN, VIOLET),
+              "logo": ("duo", CYAN, VIOLET), "rear": ("swap", CYAN, VIOLET)}, 100),
+    ("Ember", {"keyboard": ("breathing", (255, 90, 0), (255, 0, 0)), "power": ("static", (255, 40, 0), (255, 0, 0)),
+               "logo": ("fire", (255, 90, 0), (255, 0, 0)), "rear": ("fire", (255, 90, 0), (255, 0, 0))}, 100),
+    ("Aurora", {"keyboard": ("mix", (0, 255, 140), (130, 80, 255)), "power": ("aurora", (0, 255, 140), (130, 80, 255)),
+                "logo": ("aurora", (0, 255, 140), (130, 80, 255)), "rear": ("swap", (0, 255, 140), (130, 80, 255))}, 100),
+    ("Rainbow", {"keyboard": ("wave", (255, 60, 200), CYAN), "power": ("spectrum", (255, 60, 200), CYAN),
+                 "logo": ("spectrum", (255, 60, 200), CYAN), "rear": ("rainbow_wave", (255, 60, 200), CYAN)}, 100),
+    ("Ocean", {"keyboard": ("nightrider", (0, 120, 255), CYAN), "power": ("static", (0, 120, 255), CYAN),
+               "logo": ("ocean", (0, 120, 255), CYAN), "rear": ("tide", (0, 160, 255), CYAN)}, 100),
+    ("Focus", {z: ("static", WHITE, WHITE) for z in lights.ZONES}, 40),
+    ("Lights off", {z: ("static", (60, 60, 60), (60, 60, 60)) for z in lights.ZONES}, 0),
+]
+SPEED_NAMES = [("slow", "Slow"), ("normal", "Normal"), ("fast", "Fast")]
 FS_NAMES = {"ntfs": "Windows", "vfat": "EFI (boot)", "ext4": "Linux", "btrfs": "Linux",
             "xfs": "Linux", "f2fs": "Linux", "exfat": "exFAT"}
 
@@ -194,36 +213,6 @@ class Segmented(Gtk.Box):
             first = first or btn
             btn.connect("toggled", self._toggled, key)
             self.append(btn)
-            self.buttons[key] = btn
-
-    def _toggled(self, btn, key):
-        if btn.get_active() and not self.loading:
-            self.on_pick(key)
-
-    def select(self, key):
-        self.loading = True
-        if key in self.buttons:
-            self.buttons[key].set_active(True)
-        self.loading = False
-
-
-class ChoiceGrid(Gtk.Grid):
-    """Segmented-style single choice laid out over several rows."""
-
-    def __init__(self, options, columns, on_pick):
-        super().__init__(column_spacing=4, row_spacing=4, column_homogeneous=True)
-        self.add_css_class("awc-seg")
-        self.on_pick = on_pick
-        self.loading = False
-        self.buttons = {}
-        first = None
-        for i, (key, text) in enumerate(options):
-            btn = Gtk.ToggleButton(label=_(text))
-            if first:
-                btn.set_group(first)
-            first = first or btn
-            btn.connect("toggled", self._toggled, key)
-            self.attach(btn, i % columns, i // columns, 1, 1)
             self.buttons[key] = btn
 
     def _toggled(self, btn, key):
@@ -564,13 +553,37 @@ class Window(Adw.ApplicationWindow):
         side_wrap = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, child=side)
         side_wrap.set_size_request(410, -1)
 
+        self.slot = "color"
+        self.fx_buttons = {}
+        self.fx_previews = []
+
+        side.append(label(_("Scenes"), "awc-opt-title"))
+        scenes = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=4,
+                             min_children_per_line=4, column_spacing=6, row_spacing=6, homogeneous=True)
+        for name, zones, brightness in SCENES:
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+            shown = [lights.scaled(zones[z][1], max(brightness, 25)) for z in lights.ZONES]
+            swatch = SceneSwatch(shown)
+            swatch.set_halign(Gtk.Align.CENTER)
+            box.append(swatch)
+            box.append(label(_(name), "awc-small", xalign=0.5))
+            btn = Gtk.Button(child=box)
+            btn.add_css_class("awc-fx")
+            btn.connect("clicked", self.scene_clicked, zones, brightness)
+            scenes.append(btn)
+        side.append(scenes)
+
         self.zone_seg = Segmented([("keyboard", "Keyboard"), ("power", "Power button"), ("logo", "Logo"),
                                    ("rear", "Rear")],
                                   self.select_zone)
+        self.zone_seg.add_css_class("awc-seg-compact")
         side.append(self.zone_seg)
 
+        self.slot_seg = Segmented([("color", "Colour 1"), ("color2", "Colour 2")], self.slot_changed)
+        side.append(self.slot_seg)
+
         wheel_row = Gtk.Box(spacing=18)
-        self.wheel = ColorWheel(self.wheel_changed)
+        self.wheel = ColorWheel(self.wheel_changed, size=176)
         self.drawings.append(self.wheel)
         wheel_row.append(self.wheel)
         info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, valign=Gtk.Align.CENTER)
@@ -583,6 +596,9 @@ class Window(Adw.ApplicationWindow):
         info.append(self.rgb_label)
         wheel_row.append(info)
         side.append(wheel_row)
+        self.fixed_note = label(_("This effect has its own colours. Brightness still applies."),
+                                "awc-muted", "awc-small", wrap=True)
+        side.append(self.fixed_note)
 
         brow = Gtk.Box()
         brow.append(label(_("Brightness"), "awc-opt-title"))
@@ -593,6 +609,11 @@ class Window(Adw.ApplicationWindow):
         self.bright = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
         self.bright.set_draw_value(False)
         self.bright.connect("value-changed", self.bright_changed)
+        # The panel scrolls; without this, scrolling past the slider would change the brightness.
+        no_scroll = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
+        no_scroll.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        no_scroll.connect("scroll", lambda *_: True)
+        self.bright.add_controller(no_scroll)
         side.append(self.bright)
 
         side.append(label(_("Quick colours"), "awc-opt-title"))
@@ -606,25 +627,22 @@ class Window(Adw.ApplicationWindow):
             flow.append(btn)
         side.append(flow)
 
-        self.effect_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        self.effect_box.append(label(_("Keyboard effect"), "awc-opt-title"))
-        self.effect_seg = ChoiceGrid([("static", "Static"), ("breathing", "Breathing"), ("wave", "Wave"),
-                                      ("pulse", "Pulse"), ("mix", "Colour mix"), ("nightrider", "Night rider")],
-                                     3, self.effect_changed)
-        self.effect_box.append(self.effect_seg)
-        self.color2_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin_top=6)
-        self.color2_box.append(label(_("Second colour"), "awc-small", "awc-muted"))
-        flow2 = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=8,
-                            min_children_per_line=4, column_spacing=8, row_spacing=8)
-        for name, rgb in PRESETS:
-            btn = Gtk.Button(child=Swatch(rgb, 26, 26, 13), tooltip_text=_(name))
-            btn.add_css_class("awc-swatch")
-            btn.add_css_class("flat")
-            btn.connect("clicked", self.color2_clicked, rgb)
-            flow2.append(btn)
-        self.color2_box.append(flow2)
-        self.effect_box.append(self.color2_box)
-        side.append(self.effect_box)
+        erow = Gtk.Box()
+        erow.append(label(_("Effect"), "awc-opt-title"))
+        hint = label(_("hover to preview"), "awc-muted", "awc-small", xalign=1)
+        hint.set_hexpand(True)
+        erow.append(hint)
+        side.append(erow)
+        self.effect_grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=3,
+                                       min_children_per_line=3, column_spacing=6, row_spacing=6,
+                                       homogeneous=True)
+        side.append(self.effect_grid)
+
+        self.speed_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.speed_box.append(label(_("Speed"), "awc-opt-title"))
+        self.speed_seg = Segmented(SPEED_NAMES, self.speed_changed)
+        self.speed_box.append(self.speed_seg)
+        side.append(self.speed_box)
 
         all_btn = Gtk.Button(label=_("Use this colour on all lights"), margin_top=6)
         all_btn.connect("clicked", self.apply_all_clicked)
@@ -643,8 +661,6 @@ class Window(Adw.ApplicationWindow):
         page.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         page.append(side_wrap)
 
-        self.laptop.set_effect(self.lcfg["keyboard"]["effect"], self.lcfg["keyboard"]["color2"])
-        self.color2_box.set_visible(self.lcfg["keyboard"]["effect"] == "mix")
         self.select_zone("keyboard", rotate=False)
         return page
 
@@ -664,31 +680,125 @@ class Window(Adw.ApplicationWindow):
                 self.rotate_laptop(True)
             elif zone not in back_zones and self.laptop.showing_back:
                 self.rotate_laptop(False)
-        state = self.lcfg[zone]
-        h, s, _ = colorsys.rgb_to_hsv(*(c / 255 for c in state["color"]))
+        self.slot = "color"
+        self.build_effect_grid()
+        self.load_color_controls()
+
+    # ----- effect gallery -----
+
+    def build_effect_grid(self):
+        """One tile per effect the selected light supports, each with a live preview."""
+        for pv in self.fx_previews:
+            pv.play(False)
+        child = self.effect_grid.get_first_child()
+        while child:
+            nxt = child.get_next_sibling()
+            self.effect_grid.remove(child)
+            child = nxt
+        self.fx_buttons, self.fx_previews = {}, []
+        first = None
+        for effect in fx.effects_for(self.zone):
+            preview = EffectPreview(self.zone, effect.key)
+            preview.set_halign(Gtk.Align.CENTER)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+            box.append(preview)
+            box.append(label(_(effect.label), "awc-small", xalign=0.5))
+            btn = Gtk.ToggleButton(child=box)
+            btn.add_css_class("awc-fx")
+            if first:
+                btn.set_group(first)
+            first = first or btn
+            motion = Gtk.EventControllerMotion()
+            motion.connect("enter", lambda _c, _x, _y, p=preview: p.play(True))
+            motion.connect("leave", lambda _c, p=preview: p.play(False))
+            btn.add_controller(motion)
+            btn.connect("toggled", self.effect_toggled, effect.key)
+            self.effect_grid.append(btn)
+            self.fx_buttons[effect.key] = btn
+            self.fx_previews.append(preview)
+        self.sync_effect_controls()
+
+    def sync_effect_controls(self):
+        state = self.lcfg[self.zone]
+        effect = fx.BY_KEY[state["effect"]]
         self._loading = True
-        self.wheel.set_hsv(h, s, state["brightness"] / 100)
+        if effect.key in self.fx_buttons:
+            self.fx_buttons[effect.key].set_active(True)
+        self.speed_seg.select(state["speed"])
+        self.slot_seg.select(self.slot)
+        self._loading = False
+        self.speed_box.set_visible(effect.speed)
+        self.slot_seg.set_visible(effect.colors == 2)
+        self.fixed_note.set_visible(effect.colors == 0)
+        for pv in self.fx_previews:
+            pv.set_colors(state["color"], state["color2"], state["speed"])
+
+    def effect_toggled(self, btn, key):
+        if self._loading or not btn.get_active():
+            return
+        self.lcfg[self.zone]["effect"] = key
+        if fx.BY_KEY[key].colors < 2 and self.slot != "color":
+            self.slot = "color"
+            self.load_color_controls()
+        self.sync_effect_controls()
+        self.update_color_info()
+        self.schedule_apply(self.zone)
+
+    def speed_changed(self, speed):
+        if self._loading:
+            return
+        self.lcfg[self.zone]["speed"] = speed
+        self.sync_effect_controls()
+        self.update_color_info()
+        self.schedule_apply(self.zone)
+
+    def slot_changed(self, slot):
+        if self._loading:
+            return
+        self.slot = slot
+        self.load_color_controls()
+
+    def scene_clicked(self, _btn, zones, brightness):
+        for zone, (effect, c1, c2) in zones.items():
+            self.lcfg[zone].update(effect=effect, color=list(c1), color2=list(c2),
+                                   brightness=brightness, speed="normal")
+        self.select_zone(self.zone, rotate=False)
+        self.schedule_apply("keyboard")
+        self.schedule_apply("power")
+
+    # ----- colour controls -----
+
+    def load_color_controls(self):
+        state = self.lcfg[self.zone]
+        h, sat, _v = colorsys.rgb_to_hsv(*(c / 255 for c in state[self.slot]))
+        self._loading = True
+        self.wheel.set_hsv(h, sat, state["brightness"] / 100)
         self.bright.set_value(state["brightness"])
         self._loading = False
-        self.effect_box.set_visible(zone == "keyboard")
-        self.effect_seg.select(self.lcfg["keyboard"]["effect"])
+        self.sync_effect_controls()
         self.update_color_info()
+
+    def laptop_state(self):
+        return {z: {"effect": st["effect"], "speed": st["speed"],
+                    "color": lights.scaled(st["color"], st["brightness"]),
+                    "color2": lights.scaled(st["color2"], st["brightness"])}
+                for z, st in self.lcfg.items()}
 
     def update_color_info(self):
         state = self.lcfg[self.zone]
-        shown = lights.scaled(state["color"], state["brightness"])
+        shown = lights.scaled(state[self.slot], state["brightness"])
         self.big_swatch.set_rgb(shown)
         self.hex_label.set_label("#%02X%02X%02X" % shown)
         self.rgb_label.set_label("R %d  G %d  B %d" % shown)
         b = state["brightness"]
         self.bright_label.set_label(_("off") if b == 0 else f"{b}%")
-        for z in lights.ZONES:
-            st = self.lcfg[z]
-            self.laptop.colors[z] = lights.scaled(st["color"], st["brightness"])
-        self.laptop.queue_draw()
+        for pv in self.fx_previews:
+            pv.set_colors(state["color"], state["color2"], state["speed"])
+        self.laptop.set_state(self.laptop_state())
 
     def wheel_changed(self):
-        self.lcfg[self.zone]["color"] = [int(round(c * 255)) for c in colorsys.hsv_to_rgb(self.wheel.h, self.wheel.s, 1)]
+        self.lcfg[self.zone][self.slot] = [int(round(c * 255))
+                                           for c in colorsys.hsv_to_rgb(self.wheel.h, self.wheel.s, 1)]
         self.update_color_info()
         self.schedule_apply(self.zone)
 
@@ -702,27 +812,17 @@ class Window(Adw.ApplicationWindow):
         self.schedule_apply(self.zone)
 
     def preset_clicked(self, _btn, rgb):
-        self.lcfg[self.zone]["color"] = list(rgb)
+        self.lcfg[self.zone][self.slot] = list(rgb)
         if self.lcfg[self.zone]["brightness"] == 0:
             self.lcfg[self.zone]["brightness"] = 100
-        self.select_zone(self.zone, rotate=False)
+        self.load_color_controls()
         self.schedule_apply(self.zone)
-
-    def effect_changed(self, effect):
-        self.lcfg["keyboard"]["effect"] = effect
-        self.laptop.set_effect(effect)
-        self.color2_box.set_visible(effect == "mix")
-        self.schedule_apply("keyboard")
-
-    def color2_clicked(self, _btn, rgb):
-        self.lcfg["keyboard"]["color2"] = list(rgb)
-        self.laptop.set_effect(self.lcfg["keyboard"]["effect"], rgb)
-        self.schedule_apply("keyboard")
 
     def apply_all_clicked(self, _btn):
         src = self.lcfg[self.zone]
         for z in lights.ZONES:
             self.lcfg[z]["color"] = list(src["color"])
+            self.lcfg[z]["color2"] = list(src["color2"])
             self.lcfg[z]["brightness"] = src["brightness"]
         self.update_color_info()
         self.schedule_apply("keyboard")

@@ -19,6 +19,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import awelc  # noqa: E402
 import awkbd  # noqa: E402
+import fx  # noqa: E402
 
 CONFIG_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "alienware-control")
 CONFIG = os.path.join(CONFIG_DIR, "lights.json")
@@ -26,17 +27,13 @@ LEGACY_CONFIG = os.path.join(CONFIG_DIR, "luzes.json")
 KEYBOARD_KEYS = range(160)
 ELC_ZONES = {"power": (2,), "logo": (3,), "rear": (0, 1)}
 ZONES = ("keyboard", "power", "logo", "rear")
-EFFECTS = ("static", "breathing", "wave", "pulse", "mix", "nightrider")
 HW_EFFECTS = {"breathing": awkbd.EFFECT_BREATHING, "wave": awkbd.EFFECT_WAVE, "pulse": awkbd.EFFECT_PULSE,
               "mix": awkbd.EFFECT_MIX_PULSE, "nightrider": awkbd.EFFECT_NIGHT_RIDER}
 LEGACY_EFFECTS = {"fixo": "static", "respirar": "breathing"}
+SPEEDS = ("slow", "normal", "fast")
 
-DEFAULTS = {
-    "keyboard": {"color": [0, 160, 255], "color2": [138, 60, 255], "brightness": 100, "effect": "static"},
-    "power": {"color": [0, 160, 255], "brightness": 100},
-    "logo": {"color": [0, 160, 255], "brightness": 100},
-    "rear": {"color": [0, 160, 255], "brightness": 100},
-}
+_BASE = {"color": [0, 160, 255], "color2": [138, 60, 255], "brightness": 100, "effect": "static", "speed": "normal"}
+DEFAULTS = {zone: dict(_BASE) for zone in ZONES}
 
 
 def _valid_color(value):
@@ -60,16 +57,16 @@ def load():
         values = saved.get(zone)
         if not isinstance(values, dict):
             continue
-        if _valid_color(values.get("color")):
-            cfg[zone]["color"] = values["color"]
-        if zone == "keyboard" and _valid_color(values.get("color2")):
-            cfg[zone]["color2"] = values["color2"]
+        for key in ("color", "color2"):
+            if _valid_color(values.get(key)):
+                cfg[zone][key] = values[key]
         if isinstance(values.get("brightness"), int):
             cfg[zone]["brightness"] = max(0, min(100, values["brightness"]))
-        if zone == "keyboard":
-            effect = LEGACY_EFFECTS.get(values.get("effect"), values.get("effect"))
-            if effect in EFFECTS:
-                cfg[zone]["effect"] = effect
+        effect = LEGACY_EFFECTS.get(values.get("effect"), values.get("effect"))
+        if isinstance(effect, str) and fx.valid(zone, effect):
+            cfg[zone]["effect"] = effect
+        if values.get("speed") in SPEEDS:
+            cfg[zone]["speed"] = values["speed"]
     return cfg
 
 
@@ -95,20 +92,34 @@ def apply_keyboard(state):
         kbd.set_brightness(state["brightness"])  # must come first: it resets the controller
         rgb = tuple(state["color"])
         effect = HW_EFFECTS.get(state.get("effect"))
+        tempo = awkbd.SPEED_TEMPOS.get(state.get("speed"), 0x07)
         if effect == awkbd.EFFECT_MIX_PULSE:
-            kbd.set_effect(effect, 0x07, rgb, tuple(state.get("color2", DEFAULTS["keyboard"]["color2"])), colors=2)
+            kbd.set_effect(effect, tempo, rgb, tuple(state["color2"]), colors=2)
         elif effect is not None:
-            kbd.set_effect(effect, 0x07, rgb)
+            kbd.set_effect(effect, tempo, rgb)
         else:
             kbd.set_effect(awkbd.EFFECT_EXIT, 0xFE, (0, 0, 0))
             kbd.set_colors([(k, rgb) for k in KEYBOARD_KEYS])
 
 
+def elc_groups(cfg):
+    """[(zones, actions)] for every AW-ELC light, colours already dimmed by brightness."""
+    groups = []
+    for name, zones in ELC_ZONES.items():
+        st = cfg[name]
+        lists = fx.elc_actions(st["effect"], scaled(st["color"], st["brightness"]),
+                               scaled(st["color2"], st["brightness"]), st["speed"],
+                               halves=len(zones), scale=st["brightness"] / 100)
+        if len(zones) > 1 and lists[0] == lists[1]:
+            groups.append((zones, lists[0]))
+        else:
+            groups += [((zone,), actions) for zone, actions in zip(zones, lists)]
+    return groups
+
+
 def apply_elc(cfg):
-    items = [(zone, scaled(cfg[name]["color"], cfg[name]["brightness"]))
-             for name, zones in ELC_ZONES.items() for zone in zones]
     with awelc.Elc() as elc:
-        elc.set_zone_colors(items)
+        elc.set_zone_actions(elc_groups(cfg))
         elc.set_brightness(100, [z for zones in ELC_ZONES.values() for z in zones])
 
 

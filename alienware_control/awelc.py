@@ -135,6 +135,31 @@ class Elc:
             self.send([0x03, ACTION, 0x00, 0x00, 0x01, 0x00, 0x02, r, g, b])
         self.send([0x03, ANIM, 0x00, 0x03, 0xFF, 0xFF, 0x00, 0x00], expect=4, wait=1.0)
 
+    def set_zone_actions(self, groups):
+        """groups: [(zones, actions)], actions = [(mode, duration, tempo, (r, g, b)), ...].
+
+        Each group loops through its own actions (mode 0 colour, 1 pulse, 2 morph), all
+        inside one volatile animation, so the groups start together and stay in step.
+        """
+        for zones, actions in groups:
+            if not zones or not 1 <= len(actions) <= 12:
+                raise ElcError("bad animation: needs zones and 1 to 12 actions")
+            for mode, duration, tempo, rgb in actions:
+                if mode not in (0, 1, 2) or not 1 <= duration <= 0xFFFF or not 1 <= tempo <= 0xFFFF:
+                    raise ElcError("bad animation action")
+                if len(rgb) != 3 or any(not 0 <= c <= 255 for c in rgb):
+                    raise ElcError("bad animation colour")
+        self.send([0x03, ANIM, 0x00, 0x01, 0xFF, 0xFF, 0x00, 0x00], expect=4)
+        for zones, actions in groups:
+            zones = list(zones)
+            self.send([0x03, SELECT, 0x01, len(zones) >> 8, len(zones) & 0xFF, *zones])
+            for i in range(0, len(actions), 3):  # at most 3 actions per report
+                payload = [0x03, ACTION]
+                for mode, duration, tempo, (r, g, b) in actions[i:i + 3]:
+                    payload += [mode, duration >> 8, duration & 0xFF, tempo >> 8, tempo & 0xFF, r, g, b]
+                self.send(payload)
+        self.send([0x03, ANIM, 0x00, 0x03, 0xFF, 0xFF, 0x00, 0x00], expect=4, wait=1.0)
+
     def set_brightness(self, percent, zones):
         dim = 100 - max(0, min(100, int(percent)))
         for i in range(0, len(zones), 28):

@@ -105,7 +105,10 @@
 - A drawing of the laptop that lights up with your colours, and flips with an animation to show the lid.
 - Four lights: the keyboard, the power button, the lid logo and the **rear light strip**. Click one on the drawing to edit it.
 - Colour wheel, brightness, hex and RGB readout, quick colours.
-- Six keyboard modes: **static, breathing, wave, pulse, colour mix and night rider**. They run on the keyboard itself, so they keep going with the app closed.
+- **Effect gallery** with live previews for every light. Keyboard: static, breathing, wave, pulse, colour mix, night rider. Power button, logo and rear strip: breathing, pulse, colour shift, spectrum, fire, aurora, ocean, sunset. The rear strip has two halves, so it also gets two-halves, swap, tide, rainbow wave and police.
+- **Scenes:** one click sets all four lights (Neon, Ember, Aurora, Rainbow, Ocean, Focus, Lights off).
+- Speed (slow, normal, fast) and a second colour where the effect uses one.
+- Effects run on the controllers themselves, so they keep going with the app closed and use no CPU.
 - Colours are re-applied at every login.
 
 </td>
