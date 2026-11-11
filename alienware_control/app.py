@@ -529,8 +529,11 @@ class Window(Adw.ApplicationWindow):
         self.worker = lights.Worker(lambda errs: GLib.idle_add(self._lights_done, errs))
         self.apply_source = None
         self.pending_parts = set()
-        self.has_kbd = awkbd.find_device() is not None
-        self.has_elc = awelc.find_device() is not None
+        # AWC_DEMO (developer aid, used for the README recording): animate the drawing only,
+        # never send anything to the lighting controllers.
+        self.demo = "AWC_DEMO" in os.environ
+        self.has_kbd = not self.demo and awkbd.find_device() is not None
+        self.has_elc = not self.demo and awelc.find_device() is not None
 
         page = Gtk.Box()
         overlay = Gtk.Overlay(hexpand=True)
@@ -627,7 +630,9 @@ class Window(Adw.ApplicationWindow):
         side.append(all_btn)
         self.lights_status = label("", "awc-muted", "awc-small", wrap=True)
         side.append(self.lights_status)
-        if not (self.has_kbd or self.has_elc):
+        if self.demo:
+            pass
+        elif not (self.has_kbd or self.has_elc):
             self.lights_status.set_label(_("No Alienware lighting controller found: preview only."))
         elif not self.has_kbd:
             self.lights_status.set_label(_("Keyboard lighting controller not found on this computer."))

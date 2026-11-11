@@ -27,6 +27,10 @@
   <a href="#help-with-other-models">Other models</a>
 </p>
 
+<p align="center">
+  <img src=".github/assets/demo.gif" alt="Demo: switching the keyboard to the wave effect, picking violet, flipping the laptop to show the lid logo, then opening the dashboard with animated gauges" width="880">
+</p>
+
 > [!IMPORTANT]
 > ### Tested only on an Alienware m15 R7
 > Developed and tested on a single machine: an **Alienware m15 R7** (Intel Core i7-12700H, NVIDIA GeForce RTX 3070 Ti Laptop GPU, per-key RGB keyboard, BIOS 1.41.0) running **Zorin OS 17.3** (Ubuntu 22.04 base), kernel 6.8, GNOME 43, GTK 4.10 and libadwaita 1.3.
