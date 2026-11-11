@@ -126,7 +126,7 @@ class Installer(Adw.ApplicationWindow):
         icon.set_pixel_size(112)
         icon.set_margin_top(12)
         box.append(icon)
-        title = Gtk.Label(label="Alienware Control")
+        title = Gtk.Label(label="Alienware Control for Linux")
         title.add_css_class("inst-title")
         box.append(title)
         intro = Gtk.Label(wrap=True, justify=Gtk.Justification.CENTER, label=_(

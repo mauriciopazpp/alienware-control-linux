@@ -259,7 +259,7 @@ class Swatch(Gtk.DrawingArea):
 
 class Window(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Alienware Control")
+        super().__init__(application=app, title="Alienware Control for Linux")
         self.app = app
         self.cfg = app.cfg
         self.set_default_size(1180, 800)
@@ -1085,7 +1085,7 @@ class SettingsWindow(Adw.PreferencesWindow):
 
         g4 = Adw.PreferencesGroup(title=_("About"))
         g4.add(Adw.ActionRow(
-            title=f"Alienware Control {VERSION}",
+            title=f"Alienware Control for Linux {VERSION}",
             subtitle=" · ".join([
                 _(sensors.machine()),
                 _("keyboard lighting: {state}").format(state=_("found") if win.has_kbd else _("not found")),

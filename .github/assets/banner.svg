@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-label="Alienware Control: temperatures, RGB lighting and power settings for Alienware laptops on Linux">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-label="Alienware Control for Linux: temperatures, RGB lighting and BIOS power settings for Alienware laptops">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#07090D"/>
@@ -45,9 +45,10 @@
   </g>
 
   <!-- text -->
+  <text x="456" y="98" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#3EE8FF" letter-spacing="6">FOR LINUX</text>
   <text x="450" y="160" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="76" font-weight="800" fill="url(#title)" letter-spacing="-1">Alienware Control</text>
   <text x="454" y="214" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="28" font-weight="500" fill="#A7B0BE">Temperatures, RGB lighting and BIOS power settings</text>
-  <text x="454" y="252" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="28" font-weight="500" fill="#A7B0BE">for Alienware laptops on Linux</text>
+  <text x="454" y="252" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="28" font-weight="500" fill="#A7B0BE">for Alienware laptops, as a native GTK 4 app</text>
 
   <!-- key row -->
   <g transform="translate(454 280)">

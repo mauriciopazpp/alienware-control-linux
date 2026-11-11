@@ -42,7 +42,7 @@ cat > "$NOTES" <<EOF
 Needs GTK 4 and libadwaita 1.3+. Tested on an Alienware m15 R7 running Zorin OS 17.3. See the README for details and for reporting other models.
 EOF
 
-git tag -a "$TAG" -m "Alienware Control $VERSION"
+git tag -a "$TAG" -m "Alienware Control for Linux $VERSION"
 git push -q origin "$TAG"
-gh release create "$TAG" "$DEB" --title "Alienware Control $VERSION" --notes-file "$NOTES" --verify-tag
+gh release create "$TAG" "$DEB" --title "Alienware Control for Linux $VERSION" --notes-file "$NOTES" --verify-tag
 echo "Published: $(gh release view "$TAG" --json url --jq .url)"

@@ -8,7 +8,7 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="$(sed -n 's/^VERSION = "\(.*\)"$/\1/p' "$ROOT/alienware_control/app.py")"
 MAINTAINER="${MAINTAINER:-Mauricio Paz <8238958+mauriciopazpp@users.noreply.github.com>}"
-HOMEPAGE="${HOMEPAGE:-https://github.com/mauriciopazpp/alienware-control}"
+HOMEPAGE="${HOMEPAGE:-https://github.com/mauriciopazpp/alienware-control-linux}"
 [ -n "$VERSION" ] || { echo "could not read VERSION from app.py" >&2; exit 1; }
 
 OUT="$ROOT/dist"
@@ -50,7 +50,7 @@ Depends: python3, python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, gir1.2-adw-1 (>=
 Recommends: power-profiles-daemon
 Maintainer: $MAINTAINER
 Homepage: $HOMEPAGE
-Description: Control panel for Alienware laptops
+Description: Alienware Control for Linux, a control panel for Alienware laptops
  Temperatures, fans, disks and battery health; RGB lighting for the keyboard,
  power button and lid logo; BIOS thermal mode, Turbo Boost and battery charging
  mode; and a low disk space alert. Tested on an Alienware m15 R7.

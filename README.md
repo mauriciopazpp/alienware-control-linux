@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/banner.svg" alt="Alienware Control: temperatures, RGB lighting and BIOS power settings for Alienware laptops on Linux" width="100%">
+  <img src=".github/assets/banner.svg" alt="Alienware Control for Linux: temperatures, RGB lighting and BIOS power settings for Alienware laptops" width="100%">
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>A native control panel for Alienware laptops on Linux.</b><br>
+  <b>Alienware Control for Linux: a native control panel for Alienware laptops.</b><br>
   Dial gauges for temperatures and fans, per-key RGB lighting with hardware effects,<br>
   BIOS thermal mode, Turbo Boost and battery charging, and a low disk space alert.
 </p>
@@ -136,15 +136,15 @@
 
 ### Option 1: the .deb package (Debian-based distributions)
 
-Download `alienware-control_<version>_all.deb` from the [Releases](https://github.com/mauriciopazpp/alienware-control/releases) page and double-click it. Remove it the same way, or with `sudo apt remove alienware-control`.
+Download `alienware-control_<version>_all.deb` from the [Releases](https://github.com/mauriciopazpp/alienware-control-linux/releases) page and double-click it. Remove it the same way, or with `sudo apt remove alienware-control`.
 
 Build it yourself with `installer/build-deb.sh`, which writes it to `dist/`.
 
 ### Option 2: the graphical installer (any distribution)
 
 ```sh
-git clone https://github.com/mauriciopazpp/alienware-control.git
-cd alienware-control
+git clone https://github.com/mauriciopazpp/alienware-control-linux.git
+cd alienware-control-linux
 /usr/bin/python3 installer/installer.py
 ```
 
@@ -325,7 +325,7 @@ On some hybrid-graphics laptops the NVIDIA GPU never sleeps because its HDMI aud
 
 ## Help with other models
 
-Tried it on a different Alienware or Dell G-series laptop? Please [open an issue](https://github.com/mauriciopazpp/alienware-control/issues) with the output of:
+Tried it on a different Alienware or Dell G-series laptop? Please [open an issue](https://github.com/mauriciopazpp/alienware-control-linux/issues) with the output of:
 
 ```sh
 cat /sys/class/dmi/id/product_name

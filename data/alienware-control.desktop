@@ -2,7 +2,7 @@
 Type=Application
 Name=Alienware Control
 GenericName=Temperatures, lighting and power
-Comment=Temperatures, fans, disks, keyboard and logo lighting, thermal mode and battery charging for Alienware laptops
+Comment=Alienware Control for Linux: temperatures, fans, disks, RGB lighting, thermal mode and battery charging
 Exec=alienware-control
 Icon=alienware-control
 Terminal=false
