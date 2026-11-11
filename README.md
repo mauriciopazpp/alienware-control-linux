@@ -28,7 +28,7 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/demo.gif" alt="Demo: switching the keyboard to the wave effect, picking violet, flipping the laptop to show the lid logo, then opening the dashboard with animated gauges" width="100%">
+  <img src=".github/assets/demo.gif" alt="Demo: switching the keyboard to the wave effect, picking violet, flipping the laptop to show the lid logo, then opening the dashboard with animated gauges" width="880">
 </p>
 
 > [!IMPORTANT]
@@ -44,46 +44,62 @@
 
 ## Screenshots
 
-### Dashboard
-Live dial gauges, disk usage with risk labels and battery health.
-
-<img src="screenshots/dashboard.png" alt="Dashboard with dial gauges for CPU, GPU, load, memory, fans and SSDs, disk rings and battery health" width="100%">
-
-### Lighting
-Colour wheel, brightness and six hardware keyboard effects. One click flips the laptop to edit the lid logo.
-
-<img src="screenshots/lighting-front.png" alt="Lighting page: laptop drawing lit in blue, colour wheel, quick colours and six keyboard effects" width="100%">
-
-<img src="screenshots/lighting-back.png" alt="Lighting page after flipping the laptop around, showing the lit lid emblem" width="100%">
-
-### Power
-Power profile, BIOS thermal mode, Turbo Boost and battery charging mode.
-
-<img src="screenshots/power.png" alt="Power page with power profile, BIOS thermal mode, Turbo Boost and battery charging mode" width="100%">
+<table>
+  <tr>
+    <td width="50%"><img src="screenshots/dashboard.png" alt="Dashboard with dial gauges for CPU, GPU, load, memory, fans and SSDs, disk rings and battery health"></td>
+    <td width="50%"><img src="screenshots/lighting-front.png" alt="Lighting page: laptop drawing lit in blue, colour wheel, quick colours and six keyboard effects"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Dashboard</b><br><sub>Live dial gauges, disk usage with risk labels, battery health</sub></td>
+    <td align="center"><b>Lighting</b><br><sub>Colour wheel, brightness and six hardware keyboard effects</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/lighting-back.png" alt="Lighting page after flipping the laptop around, showing the lit lid emblem"></td>
+    <td width="50%"><img src="screenshots/power.png" alt="Power page with power profile, BIOS thermal mode, Turbo Boost and battery charging mode"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Lighting, back view</b><br><sub>One click flips the laptop to edit the lid logo</sub></td>
+    <td align="center"><b>Power</b><br><sub>Power profile, BIOS thermal mode, Turbo Boost, charging mode</sub></td>
+  </tr>
+</table>
 
 <details>
 <summary><b>More screenshots: settings, themes, Portuguese, installer</b></summary>
-
-#### Settings
-<img src="screenshots/settings.png" alt="Settings window with three themes, language, refresh interval and disk alert" width="100%">
-
-#### GTK (system) theme
-<img src="screenshots/theme-gtk.png" alt="Dashboard using the system GTK theme" width="100%">
-
-#### Portuguese, Real Amoled theme
-<img src="screenshots/portuguese-amoled.png" alt="Lighting page in Portuguese with the Real Amoled theme" width="100%">
-
-#### Graphical installer
-<img src="screenshots/installer.png" alt="Graphical installer checking the computer" width="100%">
+<br>
+<table>
+  <tr>
+    <td width="50%"><img src="screenshots/settings.png" alt="Settings window with three themes, language, refresh interval and disk alert"></td>
+    <td width="50%"><img src="screenshots/theme-gtk.png" alt="Dashboard using the system GTK theme"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Settings</b></td>
+    <td align="center"><b>GTK (system) theme</b></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/portuguese-amoled.png" alt="Lighting page in Portuguese with the Real Amoled theme"></td>
+    <td width="50%"><img src="screenshots/installer.png" alt="Graphical installer checking the computer"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Portuguese, Real Amoled theme</b></td>
+    <td align="center"><b>Graphical installer</b></td>
+  </tr>
+</table>
 </details>
 
 ## Features
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
 
 ### Dashboard
 - Dial gauges for CPU and GPU temperature, CPU load, memory, every fan and every NVMe SSD. The arc turns amber when warm and red when hot.
 - The GPU gauge never wakes the NVIDIA card just to read it.
 - Disk rings for every mounted volume, including LUKS and LVM, labelled OK, Warning (80%) or Risk (90%).
 - Battery charge, status and health compared with the design capacity.
+
+</td>
+    <td width="50%" valign="top">
 
 ### Lighting
 - A drawing of the laptop that lights up with your colours, and flips with an animation to show the lid.
@@ -92,6 +108,11 @@ Power profile, BIOS thermal mode, Turbo Boost and battery charging mode.
 - Six keyboard modes: **static, breathing, wave, pulse, colour mix and night rider**. They run on the keyboard itself, so they keep going with the app closed.
 - Colours are re-applied at every login.
 
+</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+
 ### Power
 - Power profile (power saver, balanced, performance) through `power-profiles-daemon`, no password.
 - BIOS thermal mode: quiet, balanced, performance, battery.
@@ -99,11 +120,18 @@ Power profile, BIOS thermal mode, Turbo Boost and battery charging mode.
 - Battery charging mode, including a custom start and stop range. "Mostly plugged in" stops a laptop that lives on the charger from sitting at 100%.
 - A banner tells you when the BIOS needs a restart.
 
+</td>
+    <td width="50%" valign="top">
+
 ### Settings
 - Three themes: **GTK (system)** follows your desktop theme, **Neon** and **Real Amoled**.
 - English or Brazilian Portuguese, or follow the system.
 - Gauge refresh rate, °C or °F.
 - **Disk space alert:** a desktop notification when a Linux disk passes your threshold. A full Linux disk can crash apps, break updates half-way and stop the desktop from starting. It keeps watching with the app closed, using about 19 MB of RAM.
+
+</td>
+  </tr>
+</table>
 
 ## Install
 
@@ -126,7 +154,7 @@ cd alienware-control-linux
 
 Or double-click **Install** (`Install.desktop`) in the folder. That works in KDE Dolphin, Nemo, Thunar and Caja. GNOME Files 42 and newer no longer run launchers from regular folders, so on GNOME use the command above.
 
-<img src="screenshots/installer.png" alt="Graphical installer listing what it found on the computer" width="100%">
+<p align="center"><img src="screenshots/installer.png" alt="Graphical installer listing what it found on the computer" width="420"></p>
 
 The installer checks your computer, shows which features will work, asks for your password once and installs everything. Run it again later to update.
 
