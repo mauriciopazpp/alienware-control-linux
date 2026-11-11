@@ -18,7 +18,7 @@ import gi  # noqa: E402
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 import awelc  # noqa: E402
 import awkbd  # noqa: E402
@@ -579,9 +579,6 @@ class Window(Adw.ApplicationWindow):
         self.zone_seg.add_css_class("awc-seg-compact")
         side.append(self.zone_seg)
 
-        self.slot_seg = Segmented([("color", "Colour 1"), ("color2", "Colour 2")], self.slot_changed)
-        side.append(self.slot_seg)
-
         wheel_row = Gtk.Box(spacing=18)
         self.wheel = ColorWheel(self.wheel_changed, size=176)
         self.drawings.append(self.wheel)
@@ -637,6 +634,23 @@ class Window(Adw.ApplicationWindow):
                                        min_children_per_line=3, column_spacing=6, row_spacing=6,
                                        homogeneous=True)
         side.append(self.effect_grid)
+
+        # options of the selected effect: its two colours, each with a name and its own picker
+        self.color_panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.color_panel.add_css_class("awc-inner")
+        self.panel_title = label("", "awc-opt-title")
+        self.color_panel.append(self.panel_title)
+        self.panel_labels, self.panel_buttons = {}, {}
+        for key in ("color", "color2"):
+            row = Gtk.Box(spacing=10)
+            lb = label("", "awc-small")
+            lb.set_hexpand(True)
+            row.append(lb)
+            btn = self.color_button(key)
+            row.append(btn)
+            self.color_panel.append(row)
+            self.panel_labels[key], self.panel_buttons[key] = lb, btn
+        side.append(self.color_panel)
 
         self.speed_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.speed_box.append(label(_("Speed"), "awc-opt-title"))
@@ -718,6 +732,27 @@ class Window(Adw.ApplicationWindow):
             self.fx_previews.append(preview)
         self.sync_effect_controls()
 
+    def color_button(self, key):
+        """A button showing one colour; clicking it opens the system colour picker."""
+        if hasattr(Gtk, "ColorDialogButton"):  # GTK 4.10+
+            btn = Gtk.ColorDialogButton(dialog=Gtk.ColorDialog(with_alpha=False))
+            btn.connect("notify::rgba", lambda b, _p: self.panel_color_changed(key, b.get_rgba()))
+        else:
+            btn = Gtk.ColorButton()
+            btn.connect("color-set", lambda b: self.panel_color_changed(key, b.get_rgba()))
+        btn.set_valign(Gtk.Align.CENTER)
+        return btn
+
+    def panel_color_changed(self, key, rgba):
+        if self._loading:
+            return
+        self.lcfg[self.zone][key] = [int(round(c * 255)) for c in (rgba.red, rgba.green, rgba.blue)]
+        if key == "color":
+            self.load_color_controls()
+        else:
+            self.update_color_info()
+        self.schedule_apply(self.zone)
+
     def sync_effect_controls(self):
         state = self.lcfg[self.zone]
         effect = fx.BY_KEY[state["effect"]]
@@ -725,10 +760,18 @@ class Window(Adw.ApplicationWindow):
         if effect.key in self.fx_buttons:
             self.fx_buttons[effect.key].set_active(True)
         self.speed_seg.select(state["speed"])
-        self.slot_seg.select(self.slot)
+        for key, btn in self.panel_buttons.items():
+            rgba = Gdk.RGBA()
+            rgba.red, rgba.green, rgba.blue, rgba.alpha = (*(c / 255 for c in state[key]), 1.0)
+            btn.set_rgba(rgba)
         self._loading = False
         self.speed_box.set_visible(effect.speed)
-        self.slot_seg.set_visible(effect.colors == 2)
+        self.color_panel.set_visible(effect.colors == 2)
+        self.panel_title.set_label(_("{effect} options").format(effect=_(effect.label)))
+        names = (("Ring colour", "Resting keys colour") if effect.key == "ripple"
+                 else ("Colour 1", "Colour 2"))
+        self.panel_labels["color"].set_label(_(names[0]))
+        self.panel_labels["color2"].set_label(_(names[1]))
         if self.zone == "power":
             self.fixed_note.set_label(_("The power button LED has no blue: it shows red, green and their "
                                         "mixes (yellow, orange), and changes colour in steps."))
@@ -746,9 +789,6 @@ class Window(Adw.ApplicationWindow):
         if key == "ripple":
             # The ring only shows against dark keys: start with a dim version of colour 1.
             self.lcfg[self.zone]["color2"] = [int(c * 0.12) for c in self.lcfg[self.zone]["color"]]
-        if fx.BY_KEY[key].colors < 2 and self.slot != "color":
-            self.slot = "color"
-            self.load_color_controls()
         self.sync_effect_controls()
         self.update_color_info()
         self.schedule_apply(self.zone)
@@ -760,12 +800,6 @@ class Window(Adw.ApplicationWindow):
         self.sync_effect_controls()
         self.update_color_info()
         self.schedule_apply(self.zone)
-
-    def slot_changed(self, slot):
-        if self._loading:
-            return
-        self.slot = slot
-        self.load_color_controls()
 
     def scene_clicked(self, _btn, zones, brightness):
         for zone, (effect, c1, c2) in zones.items():

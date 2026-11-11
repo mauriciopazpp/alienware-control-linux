@@ -71,6 +71,9 @@ PT = {
     "Ocean": "Oceano",
     "Focus": "Foco",
     "Lights off": "Apagar",
+    "{effect} options": "Opções de {effect}",
+    "Ring colour": "Cor do anel",
+    "Resting keys colour": "Cor das teclas em repouso",
     "Colour 1": "Cor 1",
     "Colour 2": "Cor 2",
     "This effect has its own colours. Brightness still applies.":
