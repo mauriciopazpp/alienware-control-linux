@@ -529,6 +529,7 @@ class Window(Adw.ApplicationWindow):
         page = Gtk.Box()
         overlay = Gtk.Overlay(hexpand=True)
         self.laptop = LaptopView(self.select_zone)
+        self.laptop.layout = keymap.LAYOUTS[self.kb_layout()]
         self.drawings.append(self.laptop)
         overlay.set_child(self.laptop)
         tl = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, halign=Gtk.Align.START,
@@ -720,6 +721,10 @@ class Window(Adw.ApplicationWindow):
 
         self.select_zone("keyboard", rotate=False)
         return page
+
+    def kb_layout(self):
+        choice = self.cfg["kb_layout"]
+        return keymap.detect_layout() if choice == "auto" else choice
 
     def rotate_laptop(self, to_back=None):
         back = (not self.laptop.showing_back) if to_back is None else to_back
@@ -1323,6 +1328,13 @@ class SettingsWindow(Adw.PreferencesWindow):
         unit.set_selected(1 if self.cfg["unit"] == "F" else 0)
         unit.connect("notify::selected", self.unit_changed)
         g2.add(unit)
+        self.layout_keys = ["auto", *keymap.LAYOUTS]
+        kbl = Adw.ComboRow(title=_("Keyboard layout"), subtitle=_("Used by the drawing and by paint mode"),
+                           model=Gtk.StringList.new([_("Automatic (system)")]
+                                                    + [_(keymap.LAYOUT_NAMES[k]) for k in keymap.LAYOUTS]))
+        kbl.set_selected(self.layout_keys.index(self.cfg["kb_layout"]))
+        kbl.connect("notify::selected", self.layout_changed)
+        g2.add(kbl)
         self.lang_keys = ["auto", *i18n.LANGUAGES]
         lang = Adw.ComboRow(title=_("Language"), model=Gtk.StringList.new(
             [_("Automatic (system)"), *i18n.LANGUAGES.values()]))
@@ -1401,6 +1413,12 @@ class SettingsWindow(Adw.PreferencesWindow):
         self.cfg["unit"] = "F" if row.get_selected() == 1 else "C"
         self.save()
         self.win.refresh_sensors()
+
+    def layout_changed(self, row, _p):
+        self.cfg["kb_layout"] = self.layout_keys[row.get_selected()]
+        self.save()
+        self.win.laptop.layout = keymap.LAYOUTS[self.win.kb_layout()]
+        self.win.laptop.queue_draw()
 
     def language_changed(self, row, _p):
         choice = self.lang_keys[row.get_selected()]

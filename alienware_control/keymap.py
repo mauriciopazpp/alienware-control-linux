@@ -64,3 +64,62 @@ STRIPE_PALETTE = [(255, 0, 0), (0, 255, 0), (0, 60, 255), (255, 200, 0), (255, 0
 def stripe_color(light_id):
     """Colour of a light in the "colour stripes" look: one colour per grid column."""
     return STRIPE_PALETTE[(light_id % 20) % 6]
+
+
+# ---------- layouts for the drawing ----------
+# Each row is a list of (width in key units, [light ids], legend). Rows are 16 units wide.
+
+def _keys(ids, legends, width=1.0):
+    return [(width, [i], legend) for i, legend in zip(ids, legends)]
+
+
+_F_ROW = _keys(range(120, 136), ["Esc"] + [f"F{n}" for n in range(1, 13)] + ["Hm", "End", "Del"])
+_SPACE = [105, 106, 107, 108, 110]
+
+LAYOUTS = {
+    "abnt2": [
+        _F_ROW,
+        _keys(range(20, 33), list("'1234567890-=")) + [(2.0, [35], "Bksp"), (1.0, [139], "Mic")],
+        [(1.5, [40], "Tab")] + _keys(range(42, 52), list("QWERTYUIOP")) + _keys([52, 53], ["\u00b4", "["])
+        + [(1.5, [54], "Enter"), (1.0, [136], "Mute")],
+        [(1.75, [61], "Caps")] + _keys(range(62, 71), list("ASDFGHJKL")) + _keys([71, 72, 73], ["\u00c7", "~", "]"])
+        + [(1.25, [54], ""), (1.0, [138], "V+")],
+        [(1.25, [81], "Shift"), (1.0, [82], "\\")] + _keys(range(83, 90), list("ZXCVBNM"))
+        + _keys([90, 91, 92], [",", ".", ";"]) + [(1.75, [94], "Shift"), (1.0, [114], "\u2191"), (1.0, [137], "V-")],
+        [(1.5, [100], "Ctrl"), (1.0, [101], "Fn"), (1.0, [103], "Win"), (1.0, [104], "Alt"), (5.5, _SPACE, ""),
+         (1.0, [111], "AltGr"), (1.0, [109], "Menu"), (1.0, [112], "/"),
+         (1.0, [141], "\u2190"), (1.0, [142], "\u2193"), (1.0, [143], "\u2192")],
+    ],
+    # Same light grid with US legends. Not verified on a US keyboard.
+    "us": [
+        _F_ROW,
+        _keys(range(20, 33), list("`1234567890-=")) + [(2.0, [35], "Bksp"), (1.0, [139], "Mic")],
+        [(1.5, [40], "Tab")] + _keys(range(42, 52), list("QWERTYUIOP")) + _keys([52, 53], ["[", "]"])
+        + [(1.5, [54], "\\"), (1.0, [136], "Mute")],
+        [(1.75, [61], "Caps")] + _keys(range(62, 71), list("ASDFGHJKL")) + _keys([71, 72], [";", "'"])
+        + [(2.25, [73, 54], "Enter"), (1.0, [138], "V+")],
+        [(2.25, [81, 82], "Shift")] + _keys(range(83, 90), list("ZXCVBNM"))
+        + _keys([90, 91, 92], [",", ".", "/"]) + [(1.75, [94], "Shift"), (1.0, [114], "\u2191"), (1.0, [137], "V-")],
+        [(1.5, [100], "Ctrl"), (1.0, [101], "Fn"), (1.0, [103], "Win"), (1.0, [104], "Alt"), (6.5, _SPACE + [112], ""),
+         (1.0, [111], "Alt"), (1.0, [109], "Ctrl"),
+         (1.0, [141], "\u2190"), (1.0, [142], "\u2193"), (1.0, [143], "\u2192")],
+    ],
+}
+LAYOUT_NAMES = {"abnt2": "ABNT2 (Brazil)", "us": "US (not verified)"}
+ROW_HEIGHTS = [0.6, 1, 1, 1, 1, 1]
+
+
+def detect_layout():
+    """abnt2 when the system keyboard layout is Brazilian, else us."""
+    import os
+    import subprocess
+    try:
+        out = subprocess.run(["gsettings", "get", "org.gnome.desktop.input-sources", "sources"],
+                             capture_output=True, text=True, timeout=2).stdout
+        if "'br" in out:
+            return "abnt2"
+        if "'us" in out:
+            return "us"
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return "abnt2" if os.environ.get("LANG", "").startswith("pt_BR") else "us"

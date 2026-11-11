@@ -17,6 +17,7 @@ DEFAULT_CONFIG = {
     "login_lights": True,
     "disk_alert": True,
     "disk_threshold": 90,
+    "kb_layout": "auto",
 }
 THEME_NAMES = {"gtk": "GTK (system)", "neon": "Neon", "amoled": "Real Amoled"}
 
@@ -41,6 +42,8 @@ def load_config():
     if cfg["unit"] not in ("C", "F"):
         cfg["unit"] = "C"
     cfg["disk_threshold"] = max(50, min(99, cfg["disk_threshold"]))
+    if cfg["kb_layout"] not in ("auto", "abnt2", "us"):
+        cfg["kb_layout"] = "auto"
     return cfg
 
 

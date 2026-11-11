@@ -12,6 +12,7 @@ gi.require_version("PangoCairo", "1.0")
 from gi.repository import Adw, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
 import fx  # noqa: E402
+import keymap  # noqa: E402
 import theme  # noqa: E402
 
 FONT = "Inter, Cantarell, Noto Sans, Sans"
@@ -272,26 +273,6 @@ class ColorWheel(Gtk.DrawingArea):
 
 # ---------- laptop illustration ----------
 
-KEY_ROWS = [
-    (0.55, [1] * 16),
-    (1, [1] * 13 + [2]),
-    (1, [1.5] + [1] * 12 + [1.5]),
-    (1, [1.75] + [1] * 10 + [2.25]),
-    (1, [2.25] + [1] * 10 + [2.75]),
-    (1, [1.25, 1, 1.25, 1.25, 6.25, 1.25, 1.25, 1, 1, 1]),
-]
-
-
-# Light ids under each key of the drawing (see keymap.py). The drawing is a generic laptop,
-# so a few real keys share one drawn key.
-KEY_IDS = [
-    [[120 + i] for i in range(16)],
-    [[20 + i] for i in range(13)] + [[35, 139]],
-    [[40]] + [[42 + i] for i in range(12)] + [[54, 136]],
-    [[61]] + [[62 + i] for i in range(10)] + [[72, 73, 138]],
-    [[81, 82]] + [[83 + i] for i in range(10)] + [[94, 114, 137]],
-    [[100], [101], [103], [104], [105, 106, 107, 108, 110], [111], [109], [112], [141], [142, 143]],
-]
 
 
 def lerp(a, b, t):
@@ -323,6 +304,7 @@ class LaptopView(Gtk.DrawingArea):
         base = {"effect": "static", "color": (0, 160, 255), "color2": (138, 60, 255), "speed": "normal"}
         self.zones = {z: dict(base) for z in ("keyboard", "power", "logo", "rear")}
         self.selected = "keyboard"
+        self.layout = keymap.LAYOUTS["abnt2"]  # rows of (width, light ids, legend)
         self.paint = False      # paint mode: keys show `painted` and can be clicked or dragged over
         self.painted = {}       # light id -> (r, g, b)
         self.on_paint = None    # callback(list of light ids)
@@ -537,24 +519,27 @@ class LaptopView(Gtk.DrawingArea):
         lit = max(kst["color"]) > 4 or self.paint
         light = self._light("keyboard")
         self.key_quads = []
-        total_h = sum(r[0] for r in KEY_ROWS)
+        total_h = sum(keymap.ROW_HEIGHTS)
         gap_u, gap_v = 0.006, 0.035
         v = 0.0
-        for ri, (row_h, keys) in enumerate(KEY_ROWS):
-            vh = row_h / total_h
-            total_w = sum(keys)
+        legends = []
+        for ri, keys in enumerate(self.layout):
+            vh = keymap.ROW_HEIGHTS[ri] / total_h
+            total_w = sum(k[0] for k in keys)
             u = 0.0
-            for ki, kw in enumerate(keys):
+            for ki, (kw, key_ids, legend) in enumerate(keys):
                 uw = kw / total_w
                 kl = self._light("keyboard", u + uw / 2) if lit else light
                 if self.paint:
-                    rgb = self.painted.get(KEY_IDS[ri][ki][0], (0, 0, 0))
+                    rgb = self.painted.get(key_ids[0], (0, 0, 0))
                     peak = max(rgb)
                     kl = (rgb[0] / peak, rgb[1] / peak, rgb[2] / peak, 0.25 + 0.75 * peak / 255) if peak > 3 \
                         else (0.5, 0.5, 0.5, 0.12)
                 pts = [quad_point(kq, u + gap_u, v + gap_v), quad_point(kq, u + uw - gap_u, v + gap_v),
                        quad_point(kq, u + uw - gap_u, v + vh - gap_v), quad_point(kq, u + gap_u, v + vh - gap_v)]
-                self.key_quads.append((pts, KEY_IDS[ri][ki]))
+                self.key_quads.append((pts, key_ids))
+                if legend:
+                    legends.append((legend, quad_point(kq, u + uw / 2, v + vh / 2), len(legend) > 1, kl[3] if lit else 0))
                 quad_path(cr, pts)
                 cr.set_source_rgba(*theme.mix(pal["bg"], (0, 0, 0, 1), 0.3))
                 cr.fill_preserve()
@@ -568,6 +553,8 @@ class LaptopView(Gtk.DrawingArea):
                 cr.stroke()
                 u += uw
             v += vh
+        for legend, (lx, ly), small, strength in legends:
+            text(cr, legend, lx, ly, 4.6 if small else 6.2, "Bold", rgba(pal["fg"], 0.45 + 0.5 * min(1.0, strength)))
         if lit and not self.paint:  # glow under the keys
             glow = cairo.RadialGradient(300, 374, 10, 300, 374, 260)
             glow.add_color_stop_rgba(0, light[0], light[1], light[2], 0.16 * light[3])
