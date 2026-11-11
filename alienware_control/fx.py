@@ -44,6 +44,7 @@ CATALOG = [
     Effect("mix", "Colour mix", ("keyboard",), 2, True),
     Effect("nightrider", "Night rider", ("keyboard",), 1, True),
     Effect("kb_rainbow", "Rainbow wave", ("keyboard",), 0, True),
+    Effect("kb_spectrum", "Spectrum", ("keyboard",), 0, True),
     Effect("stars", "Stars (typing)", ("keyboard",), 1, False),
     Effect("duo", "Colour shift", ELC, 2, True),
     Effect("signal", "Traffic light", ("power",), 0, True),
@@ -140,6 +141,9 @@ def sample(zone, key, c1, c2, seconds, speed="normal", u=0.5):
         if key == "kb_rainbow":
             pal = PALETTES["spectrum"]
             return _palette(pal, (u * 1.5 - t * 0.9) % 1 * len(pal))
+        if key == "kb_spectrum":
+            pal = PALETTES["spectrum"]
+            return _palette(pal, t * 0.8 + int(u * 12) * 1.7)
         if key == "stars":  # a few keys twinkle, as if someone were typing
             cell = int(u * 12)
             beat = int(t * 3)

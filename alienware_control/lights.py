@@ -100,6 +100,8 @@ def apply_keyboard(state):
         tempo = awkbd.SPEED_TEMPOS.get(state.get("speed"), 0x07)
         if state.get("effect") == "kb_rainbow":  # wave + two-colour flag = rainbow wave
             kbd.set_effect(awkbd.EFFECT_WAVE, tempo, rgb, tuple(state["color2"]), colors=2)
+        elif state.get("effect") == "kb_spectrum":
+            kbd.set_effect(awkbd.EFFECT_SPECTRUM, tempo, rgb)
         elif state.get("effect") == "stars":
             kbd.set_effect(awkbd.EFFECT_LASER, 0x07, rgb)
         elif effect == awkbd.EFFECT_MIX_PULSE:
