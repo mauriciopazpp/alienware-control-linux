@@ -84,6 +84,61 @@ def nvidia_awake():
     return None
 
 
+# ---------- NVIDIA live readings ----------
+# nvidia-smi wakes a sleeping card, so the app only runs it while nvidia_awake() is True
+# and backs off once the card goes idle (see Window.poll_nvidia).
+
+NVIDIA_FIELDS = ("temperature.gpu,power.draw,power.default_limit,clocks.gr,clocks.max.gr,"
+                 "utilization.gpu,clocks_event_reasons.active")
+NVIDIA_QUERY = ["nvidia-smi", f"--query-gpu={NVIDIA_FIELDS}", "--format=csv,noheader,nounits"]
+NVIDIA_TEMPS = ["nvidia-smi", "-q", "-d", "TEMPERATURE"]
+
+HEAT_REASONS = 0x20 | 0x40 | 0x08      # software thermal, hardware thermal, hardware slowdown
+POWER_REASONS = 0x04 | 0x80            # power cap, hardware power brake
+
+
+def _num(s):
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_nvidia(out):
+    """One CSV line from NVIDIA_QUERY into a dict; None when it does not parse."""
+    parts = [p.strip() for p in (out or "").strip().splitlines()[0].split(",")] if out and out.strip() else []
+    if len(parts) < 7:
+        return None
+    temp, power, limit, clock, max_clock, util = (_num(p) for p in parts[:6])
+    try:
+        reasons = int(parts[6], 16)
+    except ValueError:
+        reasons = 0
+    if temp is None:
+        return None
+    if reasons & HEAT_REASONS:
+        limiter = "heat"
+    elif reasons & POWER_REASONS:
+        limiter = "power"
+    else:
+        limiter = "free"
+    return {"temp": temp, "power": power, "limit": limit, "clock": clock, "max_clock": max_clock,
+            "util": util, "limiter": limiter}
+
+
+def parse_nvidia_temps(out):
+    """Target and slowdown temperatures from NVIDIA_TEMPS output."""
+    found = {}
+    for line in (out or "").splitlines():
+        key, _sep, value = line.partition(":")
+        key = key.strip()
+        if key in ("GPU Target Temperature", "GPU Slowdown Temp"):
+            v = _num(value.strip().split(" ")[0])
+            if v:
+                found["target" if key.startswith("GPU Target") else "slowdown"] = v
+    return found
+
+
 def nvme_temps(hw):
     temps = {}
     for path in hw.get("nvme", []):

@@ -14,6 +14,34 @@ PT = {
     "Dashboard": "Painel",
     "Lighting": "Luzes",
     "Power": "Energia",
+    # graphics card panel
+    "Graphics card": "Placa de vídeo",
+    "Readings pause while the card sleeps": "As leituras param enquanto a placa dorme",
+    "Speed": "Velocidade",
+    "Load": "Uso",
+    "Last 2 minutes": "Últimos 2 minutos",
+    "temperature": "temperatura",
+    "power": "energia",
+    "No readings while the card sleeps": "Sem leituras enquanto a placa dorme",
+    "Asleep": "Dormindo",
+    "Asleep and using no power. Readings start when a program uses the card.":
+        "Dormindo, sem gastar energia. As leituras começam quando algum programa usar a placa.",
+    "Idle": "Ociosa",
+    "Idle. Readings paused for a minute so the card can go to sleep.":
+        "Ociosa. As leituras param por um minuto para a placa poder dormir.",
+    "Held back by heat": "Freada pelo calor",
+    "Hot at only {p:.0f} of {l:.0f} W, so it slows itself down. The cooling is not keeping up.":
+        "Quente com só {p:.0f} de {l:.0f} W, então ela se freia. A refrigeração não está dando conta.",
+    "At its heat target": "No limite de temperatura",
+    "At its temperature target under heavy load. Normal for a laptop.":
+        "No limite de temperatura com carga pesada. Normal em notebook.",
+    "At its power limit": "No limite de energia",
+    "Using all the power it is allowed. Normal under heavy load.":
+        "Usando toda a energia permitida. Normal com carga pesada.",
+    "Awake": "Acordada",
+    "Awake but doing almost nothing.": "Acordada, mas quase sem trabalho.",
+    "Running free": "Livre",
+    "Working with no limit holding it back.": "Trabalhando sem nenhum limite segurando.",
     # dashboard
     "Right now": "Agora",
     "Disks": "Discos",

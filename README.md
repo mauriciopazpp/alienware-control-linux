@@ -44,6 +44,8 @@
 
 ## Screenshots
 
+<p align="center"><img src="screenshots/gpu-panel.png" alt="Graphics card panel: temperature dial with the card's own target, power, speed and load bars, a status label reading Held back by heat, and a two-minute chart"><br><sub><b>Graphics card panel</b> (example readings from a laptop whose GPU cooling needed repair)</sub></p>
+
 <table>
   <tr>
     <td width="50%"><img src="screenshots/dashboard.png" alt="Dashboard with dial gauges for CPU, GPU, load, memory, fans and SSDs, disk rings and battery health"></td>
@@ -95,6 +97,7 @@
 ### Dashboard
 - Dial gauges for CPU and GPU temperature, CPU load, memory, every fan and every NVMe SSD. The arc turns amber when warm and red when hot.
 - The GPU gauge never wakes the NVIDIA card just to read it.
+- Graphics card panel for NVIDIA GPUs: temperature with the card's own target and slowdown marks, power against the factory limit, clock speed, load, a two-minute chart, and a plain sentence saying what holds the card back (heat, power or nothing). It warns when the card is hot while drawing less than 60% of its power limit, a sign of poor cooling.
 - Disk rings for every mounted volume, including LUKS and LVM, labelled OK, Warning (80%) or Risk (90%).
 - Battery charge, status and health compared with the design capacity.
 
@@ -247,7 +250,7 @@ flowchart LR
 
 Everything is read straight from `/sys` and `/proc`, with no extra packages and no root. The app tries the common drivers in turn: Intel `coretemp`, AMD `k10temp`/`zenpower`, Dell `dell_smm` (fans) and `dell_ddv`, `amdgpu`, `nouveau`, `nvme`. Anything missing is simply not shown.
 
-The GPU temperature comes from the Dell `Video` sensor. Calling `nvidia-smi` would reset the GPU's idle timer and keep it awake forever, so the app never does that. The active or sleeping state comes from the PCI runtime power status.
+The GPU temperature on the gauges comes from the Dell `Video` sensor. The active or sleeping state comes from the PCI runtime power status. Calling `nvidia-smi` wakes a sleeping card and resets its idle timer, so the graphics card panel runs it only while the card is already awake, and stops for a minute after two idle readings so the card can go back to sleep. While the card sleeps, the panel shows it asleep and reads nothing.
 
 Disks come from `lsblk` and usage from `statvfs`, the same numbers `df` shows. Volumes inside LUKS, LVM or RAID are found too, and older `lsblk` versions (util-linux before 2.37) are supported.
 </details>

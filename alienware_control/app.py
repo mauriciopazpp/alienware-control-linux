@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -31,10 +32,10 @@ import lights  # noqa: E402
 import sensors  # noqa: E402
 import theme  # noqa: E402
 from i18n import _  # noqa: E402
-from widgets import (ColorWheel, DiskRing, EffectPreview, Gauge, LaptopView,  # noqa: E402
+from widgets import (ColorWheel, DiskRing, EffectPreview, Gauge, GpuPanel, LaptopView,  # noqa: E402
                      SceneSwatch, rounded)
 
-VERSION = "0.4.1"
+VERSION = "0.5.0"
 APP_ID = "io.github.alienware_control.AlienwareControl"
 
 
@@ -347,6 +348,18 @@ class Window(Adw.ApplicationWindow):
                                      column_spacing=14, row_spacing=14)
         page.append(self.gauge_box)
 
+        # graphics card panel (NVIDIA only); hidden on machines without one
+        self.gpu_card = card("Graphics card", "Readings pause while the card sleeps")
+        self.gpu_panel = GpuPanel()
+        self.gpu_card.append(self.gpu_panel)
+        self.gpu_card.set_visible(sensors.nvidia_awake() is not None and shutil.which("nvidia-smi") is not None)
+        self.drawings.append(self.gpu_panel)
+        self.nv_busy = False
+        self.nv_idle_reads = 0
+        self.nv_pause_until = 0.0
+        self.nv_limits_asked = False
+        page.append(self.gpu_card)
+
         bottom = Gtk.Box(spacing=14)
         disks_card = card()
         disks_card.set_hexpand(True)
@@ -440,6 +453,8 @@ class Window(Adw.ApplicationWindow):
             d, u = fmt_temp(temp, unit)
             self.set_gauge(f"ssd-{name}", f"SSD {name}", u, 90, 60, 72, temp, d, temp_status(temp, 60, 72))
 
+        self.poll_nvidia()
+
         bat = sensors.battery()
         self.batt_card.set_visible(bat is not None)
         if bat:
@@ -457,6 +472,92 @@ class Window(Adw.ApplicationWindow):
                 if h < 80:
                     note += _("Worn: cap the charge level on the Power page.")
                 self.health_note.set_label(note)
+
+    # ----- graphics card -----
+
+    def _gpu_show(self, state, data=None):
+        unit = self.cfg["unit"]
+        fmt = (lambda c: fmt_temp(c, unit)[0])
+        d = data or self.gpu_panel.data
+        if state == "asleep":
+            pill, verdict = _("Asleep"), _("Asleep and using no power. Readings start when a program uses the card.")
+        elif state == "resting":
+            pill, verdict = _("Idle"), _("Idle. Readings paused for a minute so the card can go to sleep.")
+        else:
+            limiter = d["limiter"]
+            limit = d.get("limit") or 0
+            share = (d.get("power") or 0) / limit if limit else 1
+            if limiter == "heat" and share < 0.6:
+                pill = _("Held back by heat")
+                verdict = _("Hot at only {p:.0f} of {l:.0f} W, so it slows itself down. "
+                            "The cooling is not keeping up.").format(p=d.get("power") or 0, l=limit)
+            elif limiter == "heat":
+                pill = _("At its heat target")
+                verdict = _("At its temperature target under heavy load. Normal for a laptop.")
+            elif limiter == "power":
+                pill = _("At its power limit")
+                verdict = _("Using all the power it is allowed. Normal under heavy load.")
+            elif (d.get("util") or 0) < 5:
+                pill, verdict = _("Awake"), _("Awake but doing almost nothing.")
+            else:
+                pill, verdict = _("Running free"), _("Working with no limit holding it back.")
+        self.gpu_panel.update(state, data, verdict, pill, fmt, "°" + unit)
+
+    def poll_nvidia(self):
+        """Ask nvidia-smi for readings only while the card is already awake, and stop asking
+        for a minute once it goes idle, so the app never keeps the card from sleeping."""
+        if not self.gpu_card.get_visible():
+            return
+        awake = sensors.nvidia_awake()
+        if not awake:
+            self.nv_idle_reads = 0
+            self._gpu_show("asleep")
+            return
+        if time.monotonic() < self.nv_pause_until:
+            self._gpu_show("resting")
+            return
+        if self.nv_busy:
+            return
+        self.nv_busy = True
+        self._run_nvidia(sensors.NVIDIA_QUERY, self._nvidia_done)
+
+    def _run_nvidia(self, argv, done):
+        try:
+            proc = Gio.Subprocess.new(argv, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
+        except GLib.Error:
+            self.nv_busy = False
+            self.gpu_card.set_visible(False)
+            return
+        proc.communicate_utf8_async(None, None, lambda p, res: done(p, res))
+
+    def _nvidia_done(self, proc, res):
+        self.nv_busy = False
+        try:
+            _ok, out, _err = proc.communicate_utf8_finish(res)
+        except GLib.Error:
+            out = ""
+        data = sensors.parse_nvidia(out)
+        if data is None:
+            return
+        if (data.get("util") or 0) < 1:
+            self.nv_idle_reads += 1
+            if self.nv_idle_reads >= 2:
+                self.nv_idle_reads = 0
+                self.nv_pause_until = time.monotonic() + 60
+        else:
+            self.nv_idle_reads = 0
+        self._gpu_show("live", data)
+        if not self.nv_limits_asked:
+            self.nv_limits_asked = True
+            self._run_nvidia(sensors.NVIDIA_TEMPS, self._limits_done)
+
+    def _limits_done(self, proc, res):
+        try:
+            _ok, out, _err = proc.communicate_utf8_finish(res)
+        except GLib.Error:
+            return
+        self.gpu_panel.limits = sensors.parse_nvidia_temps(out)
+        self.gpu_panel.queue_draw()
 
     def refresh_disks(self):
         child = self.disk_box.get_first_child()

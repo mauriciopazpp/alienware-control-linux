@@ -14,6 +14,7 @@ from gi.repository import Adw, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 import fx  # noqa: E402
 import keymap  # noqa: E402
 import theme  # noqa: E402
+from i18n import _  # noqa: E402
 
 FONT = "Inter, Cantarell, Noto Sans, Sans"
 
@@ -741,3 +742,234 @@ class SceneSwatch(Gtk.DrawingArea):
             grad.add_color_stop_rgb(i / max(1, len(self.colors) - 1), r / 255, g / 255, b / 255)
         cr.set_source(grad)
         cr.paint()
+
+
+# ---------- graphics card panel ----------
+
+class GpuPanel(Gtk.DrawingArea):
+    """Live NVIDIA panel: temperature dial with the card's own limits, power and speed bars,
+    and a two-minute history. Drawn only when new readings arrive (no animation loop)."""
+
+    HISTORY = 60
+    VIOLET = (0.66, 0.52, 1.0, 1)
+
+    def __init__(self):
+        super().__init__()
+        self.state = "none"          # none | asleep | resting | live
+        self.data = None
+        self.limits = {}
+        self.verdict = ""
+        self.pill = ""
+        self.unit = "°C"
+        self.fmt = lambda c: f"{c:.0f}"
+        self.history = []            # (temp or None, power fraction or None)
+        self.temp = Animated(self, self.queue_draw)
+        self.power = Animated(self, self.queue_draw)
+        self.clock = Animated(self, self.queue_draw)
+        self.util = Animated(self, self.queue_draw)
+        self.set_content_height(236)
+        self.set_hexpand(True)
+        self.set_draw_func(self.draw)
+
+    def update(self, state, data, verdict, pill, fmt, unit):
+        self.state, self.verdict, self.pill, self.fmt, self.unit = state, verdict, pill, fmt, unit
+        if data is not None:
+            self.data = data
+        live = state == "live" and self.data
+        d = self.data or {}
+        lim = d.get("limit") or 1
+        self.temp.go(min(1, (d.get("temp") or 0) / 105) if live else 0)
+        self.power.go(min(1, (d.get("power") or 0) / lim) if live else 0)
+        self.clock.go(min(1, (d.get("clock") or 0) / (d.get("max_clock") or 1)) if live else 0)
+        self.util.go(min(1, (d.get("util") or 0) / 100) if live else 0)
+        sample = (d.get("temp"), (d.get("power") or 0) / lim) if live else (None, None)
+        self.history = (self.history + [sample])[-self.HISTORY:]
+        self.queue_draw()
+
+    def _tone(self, pal):
+        if self.state != "live" or not self.data:
+            return rgba(pal["fg"], 0.45)
+        return {"heat": pal["warn"], "power": self.VIOLET}.get(self.data["limiter"], pal["accent"])
+
+    def draw(self, area, cr, w, h):
+        pal = theme.palette(self)
+        live = self.state == "live" and self.data
+        tone = self._tone(pal)
+        dial_w = 230
+        chart_w = max(220, int(w * 0.36))
+        mid_x, mid_w = dial_w + 18, w - dial_w - chart_w - 54
+        self._dial(cr, pal, tone, live, dial_w / 2, h / 2 + 4, 92)
+        self._middle(cr, pal, tone, live, mid_x, mid_w, h)
+        self._chart(cr, pal, w - chart_w, 8, chart_w, h - 16)
+
+    # temperature dial with marks at the card's target and slowdown temperatures
+    def _dial(self, cr, pal, tone, live, cx, cy, r):
+        start, sweep = math.radians(135), math.radians(270)
+        cr.new_path()
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        cr.set_line_width(14)
+        cr.set_source_rgba(*rgba(pal["fg"], 0.07))
+        cr.arc(cx, cy, r, start, start + sweep)
+        cr.stroke()
+        frac = self.temp.value
+        if frac > 0.003:
+            end = start + sweep * frac
+            grad = cairo.LinearGradient(cx - r, cy + r, cx + r, cy - r)
+            grad.add_color_stop_rgba(0, *pal["accent"])
+            grad.add_color_stop_rgba(0.75, *pal["warn"])
+            grad.add_color_stop_rgba(1, *pal["crit"])
+            for width, alpha in ((30, 0.08), (22, 0.14)):
+                cr.set_line_width(width)
+                cr.set_source_rgba(*rgba(tone, alpha))
+                cr.arc(cx, cy, r, start, end)
+                cr.stroke()
+            cr.set_line_width(14)
+            cr.set_source(grad)
+            cr.arc(cx, cy, r, start, end)
+            cr.stroke()
+            cr.set_source_rgba(1, 1, 1, 0.95)
+            cr.arc(cx + math.cos(end) * r, cy + math.sin(end) * r, 4, 0, 2 * math.pi)
+            cr.fill()
+        for key, color in (("target", pal["warn"]), ("slowdown", pal["crit"])):
+            t = self.limits.get(key)
+            if not t:
+                continue
+            a = start + sweep * min(1, t / 105)
+            cr.set_line_width(3)
+            cr.set_source_rgba(*color)
+            cr.move_to(cx + math.cos(a) * (r - 13), cy + math.sin(a) * (r - 13))
+            cr.line_to(cx + math.cos(a) * (r + 13), cy + math.sin(a) * (r + 13))
+            cr.stroke()
+        if live:
+            text(cr, self.fmt(self.data["temp"]), cx, cy - 10, 34, "Bold", pal["fg"])
+            text(cr, self.unit, cx, cy + 22, 10, "Medium", rgba(pal["fg"], 0.6))
+        else:
+            text(cr, "z z", cx, cy - 8, 26, "Bold", rgba(pal["fg"], 0.35))
+        if self.limits.get("target"):
+            text(cr, f"▲ {self.fmt(self.limits['target'])}{self.unit}", cx, cy + r - 6, 9, "Bold", rgba(pal["warn"], 0.9))
+
+    def _middle(self, cr, pal, tone, live, x, wid, h):
+        # status pill
+        layout = PangoCairo.create_layout(cr)
+        layout.set_font_description(Pango.FontDescription.from_string(f"{FONT} Bold 10"))
+        layout.set_text(self.pill, -1)
+        tw, th = layout.get_pixel_size()
+        pw, ph = tw + 30, th + 10
+        rounded(cr, x, 10, pw, ph, ph / 2)
+        cr.set_source_rgba(*rgba(tone, 0.16))
+        cr.fill()
+        cr.set_source_rgba(*tone)
+        cr.arc(x + 12, 10 + ph / 2, 3.5, 0, 2 * math.pi)
+        cr.fill()
+        cr.move_to(x + 21, 10 + (ph - th) / 2)
+        PangoCairo.show_layout(cr, layout)
+
+        d = self.data or {}
+        rows = (
+            (_("Power"), self.power.value,
+             f"{d.get('power') or 0:.0f} / {d.get('limit') or 0:.0f} W" if live else "0 W", tone, True),
+            (_("Speed"), self.clock.value,
+             f"{d.get('clock') or 0:.0f} / {d.get('max_clock') or 0:.0f} MHz" if live else "—", pal["accent"], False),
+            (_("Load"), self.util.value, f"{d.get('util') or 0:.0f}%" if live else "—", self.VIOLET, False),
+        )
+        y = 62
+        for name, frac, value, color, marker in rows:
+            text(cr, name, x, y, 10, "Bold", rgba(pal["fg"], 0.75), "left")
+            text(cr, value, x + wid, y, 10, "Bold", pal["fg"], "right")
+            by = y + 13
+            rounded(cr, x, by, wid, 9, 4.5)
+            cr.set_source_rgba(*rgba(pal["fg"], 0.07))
+            cr.fill()
+            if frac > 0.003:
+                grad = cairo.LinearGradient(x, 0, x + wid, 0)
+                grad.add_color_stop_rgba(0, *rgba(color, 0.55))
+                grad.add_color_stop_rgba(1, *color)
+                rounded(cr, x, by - 2, max(9, wid * frac), 13, 6.5)
+                cr.set_source_rgba(*rgba(color, 0.12))
+                cr.fill()
+                rounded(cr, x, by, max(9, wid * frac), 9, 4.5)
+                cr.set_source(grad)
+                cr.fill()
+            y += 44
+        self._wrap_text(cr, self.verdict, x, y - 8, wid, rgba(pal["fg"], 0.78))
+
+    def _wrap_text(self, cr, s, x, y, wid, color):
+        layout = PangoCairo.create_layout(cr)
+        layout.set_font_description(Pango.FontDescription.from_string(f"{FONT} Medium 10"))
+        layout.set_width(int(wid * Pango.SCALE))
+        layout.set_wrap(Pango.WrapMode.WORD_CHAR)
+        layout.set_text(s, -1)
+        cr.set_source_rgba(*color)
+        cr.move_to(x, y)
+        PangoCairo.show_layout(cr, layout)
+
+    # two-minute history: temperature (filled line) and power share (violet line)
+    def _chart(self, cr, pal, x, y, wid, hgt):
+        rounded(cr, x, y, wid, hgt, 14)
+        cr.set_source_rgba(*rgba(pal["fg"], 0.03))
+        cr.fill_preserve()
+        cr.set_source_rgba(*rgba(pal["fg"], 0.08))
+        cr.set_line_width(1)
+        cr.stroke()
+        px, py, pw, ph = x + 14, y + 30, wid - 28, hgt - 52
+        text(cr, _("Last 2 minutes"), px, y + 16, 9, "Bold", rgba(pal["fg"], 0.6), "left")
+        text(cr, _("temperature"), px + pw - 62, y + 16, 9, "Bold", pal["accent"], "right")
+        text(cr, _("power"), px + pw, y + 16, 9, "Bold", self.VIOLET, "right")
+
+        def ty(t):
+            return py + ph - ph * min(1, max(0, (t - 30) / 75))
+
+        target = self.limits.get("target")
+        if target:
+            cr.set_dash([4, 4])
+            cr.set_source_rgba(*rgba(pal["warn"], 0.55))
+            cr.move_to(px, ty(target))
+            cr.line_to(px + pw, ty(target))
+            cr.stroke()
+            cr.set_dash([])
+            text(cr, f"{self.fmt(target)}{self.unit}", px + 2, ty(target) - 8, 8, "Bold", rgba(pal["warn"], 0.8), "left")
+
+        n = self.HISTORY
+        step = pw / (n - 1)
+        offset = n - len(self.history)
+
+        def runs(index, to_y):
+            run = []
+            for i, sample in enumerate(self.history):
+                v = sample[index]
+                if v is None:
+                    if run:
+                        yield run
+                    run = []
+                else:
+                    run.append((px + (offset + i) * step, to_y(v)))
+            if run:
+                yield run
+
+        for run in runs(0, ty):
+            grad = cairo.LinearGradient(0, py, 0, py + ph)
+            grad.add_color_stop_rgba(0, *rgba(pal["accent"], 0.28))
+            grad.add_color_stop_rgba(1, *rgba(pal["accent"], 0.0))
+            cr.move_to(run[0][0], py + ph)
+            for p in run:
+                cr.line_to(*p)
+            cr.line_to(run[-1][0], py + ph)
+            cr.close_path()
+            cr.set_source(grad)
+            cr.fill()
+            cr.set_line_width(2.2)
+            cr.set_source_rgba(*pal["accent"])
+            cr.move_to(*run[0])
+            for p in run[1:]:
+                cr.line_to(*p)
+            cr.stroke()
+        for run in runs(1, lambda f: py + ph - ph * min(1, f)):
+            cr.set_line_width(1.8)
+            cr.set_source_rgba(*self.VIOLET)
+            cr.move_to(*run[0])
+            for p in run[1:]:
+                cr.line_to(*p)
+            cr.stroke()
+        if not any(s[0] is not None for s in self.history):
+            text(cr, _("No readings while the card sleeps"), px + pw / 2, py + ph / 2, 10, "Medium",
+                 rgba(pal["fg"], 0.4))
